@@ -14,23 +14,37 @@ export async function GET(request) {
       'Accept': 'application/json',
     }
 
-    const [quoteRes, summaryRes] = await Promise.all([
-      fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`, { headers }),
-      fetch(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=financialData,defaultKeyStatistics,assetProfile,summaryProfile`, { headers }),
-    ])
-
-    if (!quoteRes.ok) {
-      return NextResponse.json({ error: `Ticker "${ticker}" not found. Please check the symbol.` }, { status: 404 })
+    // Try original ticker, then .NS (NSE India), then .BO (BSE India)
+    const tickersToTry = [ticker]
+    if (!ticker.includes('.')) {
+      tickersToTry.push(ticker + '.NS', ticker + '.BO')
     }
 
-    const quoteJson = await quoteRes.json()
-    const summaryJson = summaryRes.ok ? await summaryRes.json() : {}
+    let quoteJson = null
+    let summaryJson = {}
+    let resolvedTicker = ticker
 
-    const meta = quoteJson?.chart?.result?.[0]?.meta
-    if (!meta) {
-      return NextResponse.json({ error: `No data found for "${ticker}".` }, { status: 404 })
+    for (const t of tickersToTry) {
+      const [quoteRes, summaryRes] = await Promise.all([
+        fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${t}?interval=1d&range=1d`, { headers }),
+        fetch(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${t}?modules=financialData,defaultKeyStatistics,assetProfile,summaryProfile`, { headers }),
+      ])
+      if (quoteRes.ok) {
+        const j = await quoteRes.json()
+        if (j?.chart?.result?.[0]?.meta) {
+          quoteJson = j
+          summaryJson = summaryRes.ok ? await summaryRes.json() : {}
+          resolvedTicker = t
+          break
+        }
+      }
     }
 
+    if (!quoteJson?.chart?.result?.[0]?.meta) {
+      return NextResponse.json({ error: `Ticker "${ticker}" not found. Check the symbol and try again.` }, { status: 404 })
+    }
+
+    const meta = quoteJson.chart.result[0].meta
     const summary = summaryJson?.quoteSummary?.result?.[0] || {}
     const fd = summary.financialData || {}
     const ks = summary.defaultKeyStatistics || {}
@@ -42,8 +56,8 @@ export async function GET(request) {
     const changePercent = prevClose ? (change / prevClose) * 100 : 0
 
     return NextResponse.json({
-      ticker,
-      name: meta.longName || meta.shortName || ticker,
+      ticker: resolvedTicker,
+      name: meta.longName || meta.shortName || resolvedTicker,
       price,
       change,
       changePercent,
