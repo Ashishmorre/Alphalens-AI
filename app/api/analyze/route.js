@@ -12,7 +12,7 @@ async function callAI(systemPrompt, userPrompt) {
           'Authorization': `Bearer ${process.env.CEREBRAS_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'llama3.3-70b',
+          model: 'llama3.1-8b',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },

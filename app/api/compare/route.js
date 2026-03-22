@@ -10,7 +10,7 @@ async function callAI(prompt) {
           'Authorization': `Bearer ${process.env.CEREBRAS_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'llama3.3-70b',
+          model: 'llama3.1-8b',
           messages: [
             { role: 'system', content: 'You are a senior portfolio manager. Return ONLY valid JSON with no markdown.' },
             { role: 'user', content: prompt },
