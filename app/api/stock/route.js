@@ -10,79 +10,88 @@ export async function GET(request) {
 
   try {
     const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Accept': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Origin': 'https://finance.yahoo.com',
+      'Referer': 'https://finance.yahoo.com/',
     }
 
-    // Try original ticker, then .NS (NSE India), then .BO (BSE India)
+    // Try ticker, then .NS, then .BO
     const tickersToTry = [ticker]
     if (!ticker.includes('.')) {
       tickersToTry.push(ticker + '.NS', ticker + '.BO')
     }
 
-    let quoteJson = null
-    let summaryJson = {}
+    let data = null
     let resolvedTicker = ticker
 
     for (const t of tickersToTry) {
-      const [quoteRes, summaryRes] = await Promise.all([
-        fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${t}?interval=1d&range=1d`, { headers }),
-        fetch(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${t}?modules=financialData,defaultKeyStatistics,assetProfile,summaryProfile,price,summaryDetail`, { headers }),
-      ])
-      if (quoteRes.ok) {
-        const j = await quoteRes.json()
-        if (j?.chart?.result?.[0]?.meta) {
-          quoteJson = j
-          summaryJson = summaryRes.ok ? await summaryRes.json() : {}
-          resolvedTicker = t
-          break
-        }
-      }
+      // Use v7 quote endpoint - returns all key stats in one call
+      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${t}&fields=longName,shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketPreviousClose,regularMarketOpen,regularMarketDayHigh,regularMarketDayLow,regularMarketVolume,averageDailyVolume3Month,marketCap,trailingPE,forwardPE,epsTrailingTwelveMonths,fiftyTwoWeekHigh,fiftyTwoWeekLow,beta,priceToBook,currency,fullExchangeName,sector,industry,fiftyDayAverage,twoHundredDayAverage,trailingAnnualDividendYield,dividendRate,earningsTimestamp`
+      
+      const res = await fetch(url, { headers })
+      if (!res.ok) continue
+
+      const json = await res.json()
+      const result = json?.quoteResponse?.result?.[0]
+      if (!result || result.regularMarketPrice == null) continue
+
+      data = result
+      resolvedTicker = t
+      break
     }
 
-    if (!quoteJson?.chart?.result?.[0]?.meta) {
+    if (!data) {
       return NextResponse.json({ error: `Ticker "${ticker}" not found. Check the symbol and try again.` }, { status: 404 })
     }
 
-    const meta = quoteJson.chart.result[0].meta
-    const summary = summaryJson?.quoteSummary?.result?.[0] || {}
-    const fd = summary.financialData || {}
-    const ks = summary.defaultKeyStatistics || {}
-    const ap = summary.assetProfile || summary.summaryProfile || {}
-    const pr = summary.price || {}
-    const sd = summary.summaryDetail || {}
+    // Try to get extra fundamentals from quoteSummary (may or may not work)
+    let fd = {}, ks = {}, ap = {}
+    try {
+      const summaryRes = await fetch(
+        `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${resolvedTicker}?modules=financialData,defaultKeyStatistics,assetProfile`,
+        { headers }
+      )
+      if (summaryRes.ok) {
+        const sj = await summaryRes.json()
+        const r = sj?.quoteSummary?.result?.[0] || {}
+        fd = r.financialData || {}
+        ks = r.defaultKeyStatistics || {}
+        ap = r.assetProfile || {}
+      }
+    } catch (_) {}
 
-    const price = meta.regularMarketPrice
-    const prevClose = meta.chartPreviousClose || meta.previousClose
-    const change = prevClose ? price - prevClose : 0
-    const changePercent = prevClose ? (change / prevClose) * 100 : 0
+    const price = data.regularMarketPrice
+    const prevClose = data.regularMarketPreviousClose
+    const change = data.regularMarketChange ?? (prevClose ? price - prevClose : 0)
+    const changePercent = data.regularMarketChangePercent ?? (prevClose ? (change / prevClose) * 100 : 0)
 
-    // Helper: pick first non-null value
-    const pick = (...vals) => vals.find(v => v != null && !isNaN(v)) ?? null
+    const pick = (...vals) => vals.find(v => v != null && !isNaN(v) && v !== 0) ?? null
 
     return NextResponse.json({
       ticker: resolvedTicker,
-      name: meta.longName || meta.shortName || pr.longName || pr.shortName || resolvedTicker,
+      name: data.longName || data.shortName || resolvedTicker,
       price,
       change,
       changePercent,
       previousClose: prevClose,
-      open: meta.regularMarketOpen,
-      dayHigh: meta.regularMarketDayHigh,
-      dayLow: meta.regularMarketDayLow,
-      volume: meta.regularMarketVolume,
-      avgVolume: pick(meta.averageDailyVolume3Month, pr.averageDailyVolume3Month?.raw),
-      marketCap: pick(fd.marketCap?.raw, pr.marketCap?.raw, meta.marketCap),
-      pe: pick(fd.trailingPE?.raw, pr.trailingPE?.raw, sd.trailingPE?.raw),
-      forwardPE: pick(fd.forwardPE?.raw, ks.forwardPE?.raw),
-      eps: pick(ks.trailingEps?.raw, pr.epsTrailingTwelveMonths),
-      weekHigh52: pick(meta.fiftyTwoWeekHigh, sd.fiftyTwoWeekHigh?.raw),
-      weekLow52: pick(meta.fiftyTwoWeekLow, sd.fiftyTwoWeekLow?.raw),
-      beta: pick(ks.beta?.raw, sd.beta?.raw),
+      open: data.regularMarketOpen,
+      dayHigh: data.regularMarketDayHigh,
+      dayLow: data.regularMarketDayLow,
+      volume: data.regularMarketVolume,
+      avgVolume: data.averageDailyVolume3Month,
+      marketCap: pick(data.marketCap, fd.marketCap?.raw),
+      pe: pick(data.trailingPE, fd.trailingPE?.raw),
+      forwardPE: pick(data.forwardPE, fd.forwardPE?.raw, ks.forwardPE?.raw),
+      eps: pick(data.epsTrailingTwelveMonths, ks.trailingEps?.raw),
+      weekHigh52: data.fiftyTwoWeekHigh,
+      weekLow52: data.fiftyTwoWeekLow,
+      beta: pick(data.beta, ks.beta?.raw),
       roe: fd.returnOnEquity?.raw ?? null,
       roa: fd.returnOnAssets?.raw ?? null,
       debtToEquity: fd.debtToEquity?.raw ?? null,
-      profitMargin: pick(fd.profitMargins?.raw, pr.profitMargins?.raw),
+      profitMargin: fd.profitMargins?.raw ?? null,
       grossMargin: fd.grossMargins?.raw ?? null,
       operatingMargin: fd.operatingMargins?.raw ?? null,
       revenue: fd.totalRevenue?.raw ?? null,
@@ -95,15 +104,15 @@ export async function GET(request) {
       quickRatio: fd.quickRatio?.raw ?? null,
       revenueGrowth: fd.revenueGrowth?.raw ?? null,
       earningsGrowth: fd.earningsGrowth?.raw ?? null,
-      priceToBook: pick(ks.priceToBook?.raw, sd.priceToBook?.raw),
+      priceToBook: pick(data.priceToBook, ks.priceToBook?.raw),
       priceToSales: ks.priceToSalesTrailing12Months?.raw ?? null,
       enterpriseValue: ks.enterpriseValue?.raw ?? null,
       evToEbitda: ks.enterpriseToEbitda?.raw ?? null,
       evToRevenue: ks.enterpriseToRevenue?.raw ?? null,
-      dividendYield: pick(ks.dividendYield?.raw, sd.dividendYield?.raw, pr.dividendYield?.raw),
-      dividendRate: pick(ks.dividendRate?.raw, sd.dividendRate?.raw),
-      payoutRatio: pick(ks.payoutRatio?.raw, sd.payoutRatio?.raw),
-      sharesOutstanding: pick(ks.sharesOutstanding?.raw, pr.sharesOutstanding?.raw),
+      dividendYield: pick(data.trailingAnnualDividendYield, ks.dividendYield?.raw),
+      dividendRate: pick(data.dividendRate, ks.dividendRate?.raw),
+      payoutRatio: ks.payoutRatio?.raw ?? null,
+      sharesOutstanding: ks.sharesOutstanding?.raw ?? null,
       floatShares: ks.floatShares?.raw ?? null,
       shortRatio: ks.shortRatio?.raw ?? null,
       shortPercentOfFloat: ks.shortPercentOfFloat?.raw ?? null,
@@ -113,20 +122,20 @@ export async function GET(request) {
       targetMeanPrice: fd.targetMeanPrice?.raw ?? null,
       targetMedianPrice: fd.targetMedianPrice?.raw ?? null,
       recommendationMean: fd.recommendationMean?.raw ?? null,
-      recommendationKey: fd.recommendationKey || pr.recommendationKey || null,
+      recommendationKey: fd.recommendationKey ?? null,
       numberOfAnalysts: fd.numberOfAnalystOpinions?.raw ?? null,
-      sector: ap.sector || null,
-      industry: ap.industry || null,
+      sector: data.sector || ap.sector || null,
+      industry: data.industry || ap.industry || null,
       description: ap.longBusinessSummary || null,
       employees: ap.fullTimeEmployees || null,
       country: ap.country || null,
       website: ap.website || null,
-      currency: meta.currency || pr.currency,
-      exchange: meta.fullExchangeName || meta.exchangeName || pr.exchangeName,
-      quoteType: meta.instrumentType,
-      marketState: meta.marketState,
-      fiftyDayAverage: pick(meta.fiftyDayAverage, sd.fiftyDayAverage?.raw),
-      twoHundredDayAverage: pick(meta.twoHundredDayAverage, sd.twoHundredDayAverage?.raw),
+      currency: data.currency,
+      exchange: data.fullExchangeName || data.exchange,
+      quoteType: data.quoteType,
+      marketState: data.marketState,
+      fiftyDayAverage: data.fiftyDayAverage,
+      twoHundredDayAverage: data.twoHundredDayAverage,
       fiftyTwoWeekChange: ks.fiftyTwoWeekChange?.raw ?? null,
     })
   } catch (error) {
