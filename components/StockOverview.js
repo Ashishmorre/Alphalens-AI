@@ -1,5 +1,5 @@
 'use client'
-import { formatNumber, formatPrice, formatVolume, formatMultiple, formatPct, changeColor, changeSign, truncate, getExchangeFlag } from '../lib/utils'
+import { formatNumber, formatPrice, formatVolume, formatMultiple, formatPct, changeColor, changeSign, truncate, getExchangeFlag, getCurrencySymbol } from '../lib/utils'
 
 export default function StockOverview({ data, onCompare }) {
   if (!data) return null
@@ -38,11 +38,11 @@ export default function StockOverview({ data, onCompare }) {
 
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap' }}>
               <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 'clamp(2rem, 5vw, 3rem)', fontWeight: 400, color: 'var(--txt-primary)', letterSpacing: '-0.02em', lineHeight: 1 }}>
-                {formatPrice(data.price)}
+                {formatPrice(data.price, data.currency)}
               </span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                 <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.1rem', color: changeColor, fontWeight: 500 }}>
-                  {changeSign(data.change)}{formatPrice(Math.abs(data.change))}
+                  {changeSign(data.change)}{formatPrice(Math.abs(data.change), data.currency)}
                 </span>
                 <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.9rem', color: changeColor }}>
                   {changeSign(data.changePercent)}{data.changePercent?.toFixed(2)}%
@@ -54,8 +54,8 @@ export default function StockOverview({ data, onCompare }) {
             {pricePctOf52W !== null && (
               <div style={{ marginTop: '1rem', maxWidth: '320px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', marginBottom: '0.3rem' }}>
-                  <span>52W Low {formatPrice(data.weekLow52)}</span>
-                  <span>52W High {formatPrice(data.weekHigh52)}</span>
+                  <span>52W Low {formatPrice(data.weekLow52, data.currency)}</span>
+                  <span>52W High {formatPrice(data.weekHigh52, data.currency)}</span>
                 </div>
                 <div className="progress-bar">
                   <div className="progress-fill" style={{ width: `${Math.min(100, Math.max(0, pricePctOf52W))}%` }} />
@@ -74,7 +74,7 @@ export default function StockOverview({ data, onCompare }) {
               { label: 'P/E (TTM)', value: formatMultiple(data.pe) },
               { label: 'Forward P/E', value: formatMultiple(data.forwardPE) },
               { label: 'EV/EBITDA', value: formatMultiple(data.evToEbitda) },
-              { label: 'EPS (TTM)', value: formatPrice(data.eps) },
+              { label: 'EPS (TTM)', value: formatPrice(data.eps, data.currency) },
               { label: 'Beta', value: data.beta?.toFixed(2) || '—' },
               { label: 'Volume', value: formatVolume(data.volume) },
               { label: 'Avg Volume', value: formatVolume(data.avgVolume) },
@@ -104,7 +104,7 @@ export default function StockOverview({ data, onCompare }) {
           { label: 'Net Margin', value: formatPct(data.profitMargin) },
           { label: 'ROE', value: formatPct(data.roe) },
           { label: 'D/E Ratio', value: formatMultiple(data.debtToEquity) },
-          { label: 'Analyst Target', value: formatPrice(data.targetMeanPrice) },
+          { label: 'Analyst Target', value: formatPrice(data.targetMeanPrice, data.currency) },
         ].map(({ label, value }) => (
           <div key={label} className="card" style={{ padding: '0.75rem 1rem' }}>
             <div style={{ fontSize: '0.68rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.3rem' }}>{label}</div>
