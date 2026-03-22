@@ -1,28 +1,62 @@
 import { NextResponse } from 'next/server'
 
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = 'llama-3.3-70b-versatile'
+// ─── AI caller — tries Cerebras first, falls back to Groq ─────────────────
+async function callAI(systemPrompt, userPrompt) {
+  // Try Cerebras first (1M tokens/day free)
+  if (process.env.CEREBRAS_API_KEY) {
+    try {
+      const res = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CEREBRAS_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 4096,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.choices?.[0]?.message?.content) {
+        return parseJSON(data.choices[0].message.content)
+      }
+    } catch (e) {
+      console.log('Cerebras failed, trying Groq...', e.message)
+    }
+  }
 
-async function callGroq(systemPrompt, userPrompt) {
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 4096,
-    }),
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error?.message || 'Groq API error')
-  const text = data.choices?.[0]?.message?.content || ''
+  // Fallback to Groq
+  if (process.env.GROQ_API_KEY) {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 4096,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error?.message || 'Groq API error')
+    return parseJSON(data.choices?.[0]?.message?.content || '')
+  }
+
+  throw new Error('No AI API key configured. Add CEREBRAS_API_KEY or GROQ_API_KEY to .env.local')
+}
+
+function parseJSON(text) {
   const clean = text.replace(/```json\s*/gi, '').replace(/```/g, '').trim()
   const match = clean.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('No valid JSON returned from AI')
@@ -41,31 +75,31 @@ function pct(n) { return n == null ? 'N/A' : (n * 100).toFixed(1) + '%' }
 function buildThesisPrompt(ticker, d) {
   return {
     system: 'You are a senior equity analyst at a top hedge fund. Return ONLY valid JSON with no markdown, no explanation outside the JSON.',
-    user: `Analyze ${ticker} (${d.name}), trading at $${d.price?.toFixed(2)} (${d.changePercent?.toFixed(2)}% today).
+    user: `Analyze ${ticker} (${d.name}), trading at ${d.price?.toFixed(2)} ${d.currency || 'USD'} (${d.changePercent?.toFixed(2)}% today).
 
 Financials: Market Cap ${fmt(d.marketCap)}, P/E ${d.pe?.toFixed(1)||'N/A'}, Forward P/E ${d.forwardPE?.toFixed(1)||'N/A'}, EV/EBITDA ${d.evToEbitda?.toFixed(1)||'N/A'}
 Revenue ${fmt(d.revenue)}, EBITDA ${fmt(d.ebitda)}, FCF ${fmt(d.freeCashFlow)}
 Net Margin ${pct(d.profitMargin)}, Gross Margin ${pct(d.grossMargin)}, ROE ${pct(d.roe)}
 Revenue Growth ${pct(d.revenueGrowth)}, D/E ${d.debtToEquity?.toFixed(2)||'N/A'}x, Beta ${d.beta?.toFixed(2)||'N/A'}
-52W: $${d.weekLow52?.toFixed(2)}-$${d.weekHigh52?.toFixed(2)}, Analyst Target $${d.targetMeanPrice?.toFixed(2)||'N/A'}, Consensus ${d.recommendationKey||'N/A'}
+52W: ${d.weekLow52?.toFixed(2)} - ${d.weekHigh52?.toFixed(2)}, Analyst Target ${d.targetMeanPrice?.toFixed(2)||'N/A'}, Consensus ${d.recommendationKey||'N/A'}
 Sector: ${d.sector}, Industry: ${d.industry}
 ${d.description ? 'Business: ' + d.description.substring(0, 300) : ''}
 
-Return ONLY this JSON structure:
+Return ONLY this JSON:
 {
   "verdict": "BUY",
   "confidence": 75,
   "targetPrice": 200.00,
   "upsideDownside": 15.5,
   "timeHorizon": "12-18 months",
-  "thesisSummary": "2-3 sentence executive summary of investment view",
-  "bullCase": { "title": "Bull case title", "points": ["point1","point2","point3"], "targetPrice": 220.00, "probability": 40 },
-  "bearCase": { "title": "Bear case title", "points": ["point1","point2","point3"], "targetPrice": 150.00, "probability": 25 },
-  "baseCase": { "title": "Base case title", "targetPrice": 195.00, "probability": 35 },
+  "thesisSummary": "2-3 sentence executive summary",
+  "bullCase": { "title": "string", "points": ["point1","point2","point3"], "targetPrice": 220.00, "probability": 40 },
+  "bearCase": { "title": "string", "points": ["point1","point2","point3"], "targetPrice": 150.00, "probability": 25 },
+  "baseCase": { "title": "string", "targetPrice": 195.00, "probability": 35 },
   "keyDrivers": [
-    { "driver": "driver name", "impact": "POSITIVE", "detail": "explanation" },
-    { "driver": "driver name", "impact": "NEGATIVE", "detail": "explanation" },
-    { "driver": "driver name", "impact": "POSITIVE", "detail": "explanation" }
+    { "driver": "string", "impact": "POSITIVE", "detail": "string" },
+    { "driver": "string", "impact": "NEGATIVE", "detail": "string" },
+    { "driver": "string", "impact": "POSITIVE", "detail": "string" }
   ],
   "moatRating": 4.0,
   "moatType": "Network Effects",
@@ -83,27 +117,16 @@ function buildDCFPrompt(ticker, d) {
     system: 'You are a CFA charterholder and senior financial modeler. Return ONLY valid JSON with no markdown.',
     user: `Build a 5-year DCF model for ${ticker} (${d.name}).
 
-Current Price: $${d.price?.toFixed(2)}, Revenue: ${fmt(d.revenue)}, EBITDA: ${fmt(d.ebitda)}, FCF: ${fmt(d.freeCashFlow)}
+Current Price: ${d.price?.toFixed(2)} ${d.currency||'USD'}, Revenue: ${fmt(d.revenue)}, EBITDA: ${fmt(d.ebitda)}, FCF: ${fmt(d.freeCashFlow)}
 Margins: Gross ${pct(d.grossMargin)}, Operating ${pct(d.operatingMargin)}, Net ${pct(d.profitMargin)}
 Growth: Revenue ${pct(d.revenueGrowth)}, EPS ${pct(d.earningsGrowth)}
 Balance: Debt ${fmt(d.totalDebt)}, Cash ${fmt(d.totalCash)}, Shares ${fmt(d.sharesOutstanding)}
 Beta: ${d.beta?.toFixed(2)||'1.0'}, D/E: ${d.debtToEquity?.toFixed(2)||'N/A'}, Sector: ${d.sector}
 Use risk-free rate 4.5%, market risk premium 5.5%.
 
-Return ONLY this JSON (use realistic numbers based on the actual financials above):
+Return ONLY this JSON (use realistic numbers based on the actual financials):
 {
-  "assumptions": {
-    "wacc": 10.5,
-    "terminalGrowthRate": 3.0,
-    "riskFreeRate": 4.5,
-    "marketRiskPremium": 5.5,
-    "taxRate": 21.0,
-    "capexAsRevenuePercent": 5.0,
-    "nwcChangeAsRevenuePercent": 2.0,
-    "revenueGrowthRates": [15.0, 12.0, 10.0, 8.0, 6.0],
-    "ebitdaMargins": [30.0, 31.0, 32.0, 33.0, 34.0],
-    "depreciation": 5.0
-  },
+  "assumptions": { "wacc": 10.5, "terminalGrowthRate": 3.0, "riskFreeRate": 4.5, "marketRiskPremium": 5.5, "taxRate": 21.0, "capexAsRevenuePercent": 5.0, "nwcChangeAsRevenuePercent": 2.0, "revenueGrowthRates": [15.0, 12.0, 10.0, 8.0, 6.0], "ebitdaMargins": [30.0, 31.0, 32.0, 33.0, 34.0], "depreciation": 5.0 },
   "projections": [
     { "year": 1, "revenue": 100000000, "ebitda": 30000000, "ebit": 25000000, "nopat": 19750000, "capex": 5000000, "nwcChange": 2000000, "fcf": 12750000 },
     { "year": 2, "revenue": 112000000, "ebitda": 34720000, "ebit": 29120000, "nopat": 23005000, "capex": 5600000, "nwcChange": 2240000, "fcf": 15165000 },
@@ -133,7 +156,7 @@ Return ONLY this JSON (use realistic numbers based on the actual financials abov
     ]
   },
   "keyRisksToModel": ["risk1", "risk2", "risk3"],
-  "analystNote": "2-3 sentence commentary on DCF result and valuation"
+  "analystNote": "2-3 sentence commentary on DCF result"
 }`
   }
 }
@@ -143,11 +166,11 @@ function buildRiskPrompt(ticker, d) {
     system: 'You are a quantitative risk analyst at a hedge fund. Return ONLY valid JSON with no markdown.',
     user: `Analyze risk and ratios for ${ticker} (${d.name}).
 
-Price $${d.price?.toFixed(2)}, Beta ${d.beta?.toFixed(2)||'N/A'}, Short Float ${pct(d.shortPercentOfFloat)}
+Price ${d.price?.toFixed(2)} ${d.currency||'USD'}, Beta ${d.beta?.toFixed(2)||'N/A'}, Short Float ${pct(d.shortPercentOfFloat)}
 P/E ${d.pe?.toFixed(1)||'N/A'}, Forward P/E ${d.forwardPE?.toFixed(1)||'N/A'}, EV/EBITDA ${d.evToEbitda?.toFixed(1)||'N/A'}, P/B ${d.priceToBook?.toFixed(2)||'N/A'}, P/S ${d.priceToSales?.toFixed(2)||'N/A'}
 ROE ${pct(d.roe)}, ROA ${pct(d.roa)}, Gross Margin ${pct(d.grossMargin)}, Net Margin ${pct(d.profitMargin)}
 D/E ${d.debtToEquity?.toFixed(2)||'N/A'}x, Current Ratio ${d.currentRatio?.toFixed(2)||'N/A'}, Quick Ratio ${d.quickRatio?.toFixed(2)||'N/A'}
-52W $${d.weekLow52?.toFixed(2)}-$${d.weekHigh52?.toFixed(2)}, 50DMA $${d.fiftyDayAverage?.toFixed(2)||'N/A'}, 200DMA $${d.twoHundredDayAverage?.toFixed(2)||'N/A'}
+52W ${d.weekLow52?.toFixed(2)}-${d.weekHigh52?.toFixed(2)}, 50DMA ${d.fiftyDayAverage?.toFixed(2)||'N/A'}, 200DMA ${d.twoHundredDayAverage?.toFixed(2)||'N/A'}
 Sector: ${d.sector}
 
 Return ONLY this JSON:
@@ -188,7 +211,7 @@ Return ONLY this JSON:
   ],
   "overallRiskScore": 4.5,
   "overallQualityScore": 8.5,
-  "riskSummary": "2-3 sentence overall risk and quality summary",
+  "riskSummary": "2-3 sentence overall risk summary",
   "peerBenchmarks": [
     { "ticker": "PEER1", "name": "Peer Company", "pe": "25x", "evEbitda": "15x", "margin": "45%" },
     { "ticker": "PEER2", "name": "Peer Company", "pe": "30x", "evEbitda": "18x", "margin": "38%" },
@@ -203,9 +226,9 @@ function buildNewsPrompt(ticker, d) {
     system: 'You are a market intelligence analyst. Return ONLY valid JSON with no markdown.',
     user: `Analyze market sentiment for ${ticker} (${d.name}).
 
-Price $${d.price?.toFixed(2)}, Today ${d.changePercent?.toFixed(2)}%, 52W Change ${d.fiftyTwoWeekChange ? pct(d.fiftyTwoWeekChange) : 'N/A'}
+Price ${d.price?.toFixed(2)} ${d.currency||'USD'}, Today ${d.changePercent?.toFixed(2)}%
 Analyst Consensus: ${d.recommendationKey||'N/A'} (${d.numberOfAnalysts||'N/A'} analysts)
-Target: $${d.targetLowPrice?.toFixed(2)||'N/A'}-$${d.targetHighPrice?.toFixed(2)||'N/A'} (Mean $${d.targetMeanPrice?.toFixed(2)||'N/A'})
+Target: ${d.targetLowPrice?.toFixed(2)||'N/A'}-${d.targetHighPrice?.toFixed(2)||'N/A'} (Mean ${d.targetMeanPrice?.toFixed(2)||'N/A'})
 Short Interest: ${pct(d.shortPercentOfFloat)}, Revenue Growth: ${pct(d.revenueGrowth)}, EPS Growth: ${pct(d.earningsGrowth)}
 Sector: ${d.sector}, Industry: ${d.industry}
 
@@ -213,7 +236,7 @@ Return ONLY this JSON:
 {
   "sentimentScore": 65,
   "sentimentLabel": "BULLISH",
-  "sentimentRationale": "2-3 sentence rationale for the sentiment score",
+  "sentimentRationale": "2-3 sentence rationale",
   "analystConsensus": {
     "rating": "Buy",
     "meanTarget": 195.00,
@@ -222,36 +245,36 @@ Return ONLY this JSON:
     "buyCount": 30,
     "holdCount": 12,
     "sellCount": 3,
-    "noteOnConsensus": "brief note on analyst consensus"
+    "noteOnConsensus": "brief note"
   },
   "keyThemes": [
-    { "theme": "Theme name", "sentiment": "POSITIVE", "detail": "detailed explanation", "timeframe": "Near-term" },
-    { "theme": "Theme name", "sentiment": "NEGATIVE", "detail": "detailed explanation", "timeframe": "Medium-term" },
-    { "theme": "Theme name", "sentiment": "POSITIVE", "detail": "detailed explanation", "timeframe": "Long-term" }
+    { "theme": "Theme name", "sentiment": "POSITIVE", "detail": "detail", "timeframe": "Near-term" },
+    { "theme": "Theme name", "sentiment": "NEGATIVE", "detail": "detail", "timeframe": "Medium-term" },
+    { "theme": "Theme name", "sentiment": "POSITIVE", "detail": "detail", "timeframe": "Long-term" }
   ],
   "bullCatalysts": [
-    { "catalyst": "Catalyst name", "probability": "HIGH", "potentialImpact": "impact description" },
-    { "catalyst": "Catalyst name", "probability": "MEDIUM", "potentialImpact": "impact description" }
+    { "catalyst": "Catalyst name", "probability": "HIGH", "potentialImpact": "impact" },
+    { "catalyst": "Catalyst name", "probability": "MEDIUM", "potentialImpact": "impact" }
   ],
   "bearCatalysts": [
-    { "catalyst": "Catalyst name", "probability": "MEDIUM", "potentialImpact": "impact description" },
-    { "catalyst": "Catalyst name", "probability": "LOW", "potentialImpact": "impact description" }
+    { "catalyst": "Catalyst name", "probability": "MEDIUM", "potentialImpact": "impact" },
+    { "catalyst": "Catalyst name", "probability": "LOW", "potentialImpact": "impact" }
   ],
   "macroExposure": [
     { "factor": "Interest Rates", "exposure": "NEGATIVE", "detail": "explanation" },
     { "factor": "USD Strength", "exposure": "NEUTRAL", "detail": "explanation" },
-    { "factor": "AI Spending", "exposure": "POSITIVE", "detail": "explanation" }
+    { "factor": "Sector Tailwinds", "exposure": "POSITIVE", "detail": "explanation" }
   ],
   "institutionalActivity": {
     "shortInterestTrend": "Declining",
     "shortSqueezeRisk": "LOW",
-    "institutionalOwnershipNote": "brief note on institutional ownership"
+    "institutionalOwnershipNote": "brief note"
   },
   "upcomingEvents": [
     { "event": "Quarterly Earnings", "expectedDate": "Next quarter", "marketImplications": "implications" },
-    { "event": "Product Launch", "expectedDate": "H2 2025", "marketImplications": "implications" }
+    { "event": "Product/Policy Event", "expectedDate": "H2 2025", "marketImplications": "implications" }
   ],
-  "tradingNote": "2-3 sentence tactical note for the next 30-60 days"
+  "tradingNote": "2-3 sentence tactical note for next 30-60 days"
 }`
   }
 }
@@ -264,8 +287,8 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    if (!process.env.GROQ_API_KEY) {
-      return NextResponse.json({ error: 'GROQ_API_KEY not configured in .env.local' }, { status: 500 })
+    if (!process.env.CEREBRAS_API_KEY && !process.env.GROQ_API_KEY) {
+      return NextResponse.json({ error: 'No AI API key configured. Add CEREBRAS_API_KEY or GROQ_API_KEY to .env.local' }, { status: 500 })
     }
 
     let prompt
@@ -277,7 +300,7 @@ export async function POST(request) {
       default: return NextResponse.json({ error: 'Invalid analysis type' }, { status: 400 })
     }
 
-    const analysisData = await callGroq(prompt.system, prompt.user)
+    const analysisData = await callAI(prompt.system, prompt.user)
     return NextResponse.json({ success: true, data: analysisData, analysisType })
   } catch (error) {
     console.error('[analyze] Error:', error.message)

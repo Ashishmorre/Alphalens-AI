@@ -1,28 +1,59 @@
 import { NextResponse } from 'next/server'
 
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = 'llama-3.3-70b-versatile'
+async function callAI(prompt) {
+  if (process.env.CEREBRAS_API_KEY) {
+    try {
+      const res = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CEREBRAS_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b',
+          messages: [
+            { role: 'system', content: 'You are a senior portfolio manager. Return ONLY valid JSON with no markdown.' },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 3000,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.choices?.[0]?.message?.content) {
+        return parseJSON(data.choices[0].message.content)
+      }
+    } catch (e) {
+      console.log('Cerebras failed, trying Groq...', e.message)
+    }
+  }
 
-async function callGroq(prompt) {
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: 'You are a senior portfolio manager. Return ONLY valid JSON with no markdown.' },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 3000,
-    }),
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error?.message || 'Groq API error')
-  const text = data.choices?.[0]?.message?.content || ''
+  if (process.env.GROQ_API_KEY) {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: 'You are a senior portfolio manager. Return ONLY valid JSON with no markdown.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 3000,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error?.message || 'Groq API error')
+    return parseJSON(data.choices?.[0]?.message?.content || '')
+  }
+
+  throw new Error('No AI API key configured')
+}
+
+function parseJSON(text) {
   const clean = text.replace(/```json\s*/gi, '').replace(/```/g, '').trim()
   const match = clean.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('No valid JSON returned')
@@ -42,18 +73,20 @@ export async function POST(request) {
   try {
     const { stock1, stock2 } = await request.json()
     if (!stock1 || !stock2) return NextResponse.json({ error: 'Both stocks required' }, { status: 400 })
-    if (!process.env.GROQ_API_KEY) return NextResponse.json({ error: 'GROQ_API_KEY not configured' }, { status: 500 })
+    if (!process.env.CEREBRAS_API_KEY && !process.env.GROQ_API_KEY) {
+      return NextResponse.json({ error: 'No AI API key configured' }, { status: 500 })
+    }
 
     const prompt = `Compare ${stock1.ticker} vs ${stock2.ticker} for investment.
 
-${stock1.ticker} (${stock1.name}): Price $${stock1.price?.toFixed(2)}, MCap ${fmt(stock1.marketCap)}, P/E ${stock1.pe?.toFixed(1)||'N/A'}, EV/EBITDA ${stock1.evToEbitda?.toFixed(1)||'N/A'}, Revenue ${fmt(stock1.revenue)}, Growth ${pct(stock1.revenueGrowth)}, Net Margin ${pct(stock1.profitMargin)}, ROE ${pct(stock1.roe)}, Beta ${stock1.beta?.toFixed(2)||'N/A'}
+${stock1.ticker} (${stock1.name}): Price ${stock1.price?.toFixed(2)} ${stock1.currency||'USD'}, MCap ${fmt(stock1.marketCap)}, P/E ${stock1.pe?.toFixed(1)||'N/A'}, EV/EBITDA ${stock1.evToEbitda?.toFixed(1)||'N/A'}, Revenue ${fmt(stock1.revenue)}, Growth ${pct(stock1.revenueGrowth)}, Net Margin ${pct(stock1.profitMargin)}, ROE ${pct(stock1.roe)}, Beta ${stock1.beta?.toFixed(2)||'N/A'}
 
-${stock2.ticker} (${stock2.name}): Price $${stock2.price?.toFixed(2)}, MCap ${fmt(stock2.marketCap)}, P/E ${stock2.pe?.toFixed(1)||'N/A'}, EV/EBITDA ${stock2.evToEbitda?.toFixed(1)||'N/A'}, Revenue ${fmt(stock2.revenue)}, Growth ${pct(stock2.revenueGrowth)}, Net Margin ${pct(stock2.profitMargin)}, ROE ${pct(stock2.roe)}, Beta ${stock2.beta?.toFixed(2)||'N/A'}
+${stock2.ticker} (${stock2.name}): Price ${stock2.price?.toFixed(2)} ${stock2.currency||'USD'}, MCap ${fmt(stock2.marketCap)}, P/E ${stock2.pe?.toFixed(1)||'N/A'}, EV/EBITDA ${stock2.evToEbitda?.toFixed(1)||'N/A'}, Revenue ${fmt(stock2.revenue)}, Growth ${pct(stock2.revenueGrowth)}, Net Margin ${pct(stock2.profitMargin)}, ROE ${pct(stock2.roe)}, Beta ${stock2.beta?.toFixed(2)||'N/A'}
 
 Return ONLY this JSON:
 {
   "winner": "${stock1.ticker}",
-  "winnerRationale": "2-3 sentence rationale for the overall winner",
+  "winnerRationale": "2-3 sentence rationale",
   "comparisonDimensions": [
     { "dimension": "Valuation", "winner": "${stock1.ticker}", "stock1Score": 7, "stock2Score": 6, "detail": "brief detail" },
     { "dimension": "Growth", "winner": "${stock2.ticker}", "stock1Score": 6, "stock2Score": 8, "detail": "brief detail" },
@@ -76,16 +109,16 @@ Return ONLY this JSON:
   "stock2Weaknesses": ["weakness1", "weakness2"],
   "recommendation": {
     "forGrowthInvestors": "${stock2.ticker}",
-    "growthRationale": "rationale for growth investors",
+    "growthRationale": "rationale",
     "forValueInvestors": "${stock1.ticker}",
-    "valueRationale": "rationale for value investors",
+    "valueRationale": "rationale",
     "forIncomeInvestors": "${stock1.ticker}",
-    "incomeRationale": "rationale for income investors"
+    "incomeRationale": "rationale"
   },
-  "portfolioContext": "2-3 sentences on how these stocks fit together in a portfolio"
+  "portfolioContext": "2-3 sentences on portfolio fit"
 }`
 
-    const data = await callGroq(prompt)
+    const data = await callAI(prompt)
     return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error('[compare] Error:', error.message)
