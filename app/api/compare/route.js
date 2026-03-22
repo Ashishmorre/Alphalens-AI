@@ -11,12 +11,13 @@ async function callAI(prompt) {
         },
         body: JSON.stringify({
           model: 'llama3.1-8b',
+          stream: false,
           messages: [
             { role: 'system', content: 'You are a senior portfolio manager. Return ONLY valid JSON with no markdown.' },
             { role: 'user', content: prompt },
           ],
           temperature: 0.7,
-          max_tokens: 3000,
+          max_completion_tokens: 3000,
         }),
       })
       const data = await res.json()

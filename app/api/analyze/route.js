@@ -13,12 +13,13 @@ async function callAI(systemPrompt, userPrompt) {
         },
         body: JSON.stringify({
           model: 'llama3.1-8b',
+          stream: false,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
           temperature: 0.7,
-          max_tokens: 4096,
+          max_completion_tokens: 4096,
         }),
       })
       const data = await res.json()
