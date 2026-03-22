@@ -175,7 +175,7 @@ export default function RiskRatios({ data }) {
 }
 
 function ScoreGauge({ score, label, inverted }) {
-  const pct = ((parseFloat(score) || 0) / 10) * 100
+  const pct = ((parseFloat(score) || 5) / 10) * 100
   const color = inverted
     ? pct > 70 ? '#ef4444' : pct > 40 ? '#f59e0b' : '#22c55e'
     : pct > 70 ? '#22c55e' : pct > 40 ? '#f59e0b' : '#ef4444'
@@ -193,7 +193,7 @@ function ScoreGauge({ score, label, inverted }) {
           />
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.15rem', color, fontWeight: 500, lineHeight: 1 }}>{parseFloat(score)?.toFixed(1)}</span>
+          <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.15rem', color, fontWeight: 500, lineHeight: 1 }}>{isNaN(parseFloat(score)) ? "N/A" : parseFloat(score).toFixed(1)}</span>
           <span style={{ fontSize: '0.6rem', color: 'var(--txt-muted)', lineHeight: 1 }}>/10</span>
         </div>
       </div>
