@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { formatPrice, formatNumber, formatPct, formatMultiple, changeColor, changeSign } from '../lib/utils'
 import { AnalysisLoader } from './LoadingCard'
+import { normalizeCompareData } from '../lib/ai-normalizer'
 
 export default function CompareStocks() {
   const [ticker1, setTicker1] = useState('')
@@ -41,7 +42,9 @@ export default function CompareStocks() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Comparison failed')
 
-      setComparison(data.data)
+      // Normalize comparison data to handle inconsistent AI formats
+      const normalizedData = normalizeCompareData(data.data)
+      setComparison(normalizedData)
       setStep('result')
     } catch (err) {
       setError(err.message)
@@ -250,7 +253,7 @@ function DimensionBar({ dim, ticker1, ticker2 }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.82rem', color: 'var(--txt-primary)' }}>{dim.dimension}</span>
           {dim.winner !== 'TIE' && (
-            <span style={{ fontSize: '0.65rem', color: 'var(--teal)', fontFamily: 'var(--font-dm-mono)' }}>→ {dim.winner}</span>
+            <span style={{ fontSize: '0.65rem', color: 'file_path', fontFamily: 'var(--font-dm-mono)' }}>→ {dim.winner}</span>
           )}
         </div>
         <span style={{ fontSize: '0.72rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', maxWidth: '280px', textAlign: 'right' }}>{dim.detail}</span>

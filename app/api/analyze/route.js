@@ -3,9 +3,9 @@ import {
   checkRateLimit,
   RATE_LIMIT_PRESETS,
   createRateLimitHeaders,
-} from '../../../../lib/server/rate-limit.js'
-import { validateAnalyzeRequest } from '../../../../lib/server/validation.js'
-import { safeParseJSON } from '../../../../lib/server/json-parser.js'
+} from '@/lib/server/rate-limit.js'
+import { validateAnalyzeRequest } from '@/lib/server/validation.js'
+import { safeParseJSON } from '@/lib/server/json-parser.js'
 import {
   checkBodySize,
   parseJSONBody,
@@ -13,8 +13,8 @@ import {
   createErrorResponse,
   callAIWithRetry,
   logError,
-} from '../../../../lib/server/api-utils.js'
-import { fmtNumber, fmtPercent } from '../../../../lib/server/yahoo-finance.js'
+} from '@/lib/server/api-utils.js'
+import { fmtNumber, fmtPercent } from '@/lib/server/yahoo-finance.js'
 
 const RATE_LIMIT = RATE_LIMIT_PRESETS.aiAnalysis
 

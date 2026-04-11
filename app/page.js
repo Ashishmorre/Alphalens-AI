@@ -11,6 +11,7 @@ import CompareStocks from '../components/CompareStocks'
 import ExportPDF from '../components/ExportPDF'
 import { AnalysisLoader, RunAnalysisButton } from '../components/LoadingCard'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { normalizeAIResponse } from '../lib/ai-normalizer'
 
 const ANALYSIS_TABS = [
   { id: 'thesis', label: 'Investment Thesis', icon: '🎯' },
@@ -80,7 +81,9 @@ export default function Home() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Analysis failed')
 
-      setAnalysisCache(prev => ({ ...prev, [cacheKey]: data.data }))
+          // Normalize AI response to handle inconsistent formats
+    const normalizedData = normalizeAIResponse(data.data, type)
+    setAnalysisCache(prev => ({ ...prev, [cacheKey]: normalizedData }))
     } catch (err) {
       setAnalysisError(err.message)
     } finally {
