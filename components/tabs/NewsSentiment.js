@@ -1,7 +1,7 @@
 'use client'
 import { sentimentColor, formatPrice } from '../../lib/utils'
 
-export default function NewsSentiment({ data }) {
+export default function NewsSentiment({ data, currency }) {
   if (!data) return null
   const d = data
   const score = d.sentimentScore || 50
@@ -40,7 +40,7 @@ export default function NewsSentiment({ data }) {
                 {d.analystConsensus.rating}
               </div>
               <div style={{ fontSize: '0.82rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', marginBottom: '0.75rem' }}>
-                Target: <span style={{ color: 'var(--txt-primary)' }}>{formatPrice(d.analystConsensus.meanTarget)}</span>
+                Target: <span style={{ color: 'var(--txt-primary)' }}>{formatPrice(d.analystConsensus.meanTarget, currency)}</span>
                 {d.analystConsensus.upside != null && (
                   <span style={{ color: d.analystConsensus.upside >= 0 ? 'var(--gain)' : 'var(--loss)', marginLeft: '0.4rem' }}>
                     ({d.analystConsensus.upside >= 0 ? '+' : ''}{d.analystConsensus.upside?.toFixed(1)}%)
@@ -81,7 +81,7 @@ export default function NewsSentiment({ data }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
         {d.bullCatalysts?.length > 0 && (
           <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
-            <SectionTitle style={{ color: 'var(--gain)' }}>🚀 Bull Catalysts</SectionTitle>
+            <SectionTitle style={{ color: 'var(--gain)' }}>Bull Catalysts</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {d.bullCatalysts.map((c, i) => (
                 <CatalystCard key={i} catalyst={c} positive />
@@ -91,7 +91,7 @@ export default function NewsSentiment({ data }) {
         )}
         {d.bearCatalysts?.length > 0 && (
           <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
-            <SectionTitle>⚠️ Bear Catalysts</SectionTitle>
+            <SectionTitle>Bear Catalysts</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {d.bearCatalysts.map((c, i) => (
                 <CatalystCard key={i} catalyst={c} positive={false} />
@@ -263,9 +263,9 @@ function CatalystCard({ catalyst, positive }) {
 
 function ExposureBadge({ exposure }) {
   const map = {
-    POSITIVE: { color: '#22c55e', text: '↑ POS' },
-    NEGATIVE: { color: '#ef4444', text: '↓ NEG' },
-    NEUTRAL: { color: '#f59e0b', text: '→ NEU' },
+    POSITIVE: { color: '#22c55e', text: 'POS' },
+    NEGATIVE: { color: '#ef4444', text: 'NEG' },
+    NEUTRAL: { color: '#f59e0b', text: 'NEU' },
   }
   const s = map[exposure?.toUpperCase()] || map.NEUTRAL
   return <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-dm-mono)', color: s.color, fontWeight: 500 }}>{s.text}</span>
