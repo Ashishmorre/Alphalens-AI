@@ -1,88 +1,34 @@
-import { NextResponse } from 'next/server'
+import {
+  getClientIP,
+  checkRateLimit,
+  RATE_LIMIT_PRESETS,
+  createRateLimitHeaders,
+} from '../../../../lib/server/rate-limit'
+import { validateCompareRequest } from '../../../../lib/server/validation'
+import { safeParseJSON } from '../../../../lib/server/json-parser'
+import {
+  checkBodySize,
+  parseJSONBody,
+  createSuccessResponse,
+  createErrorResponse,
+  callAIWithRetry,
+  logError,
+} from '../../../../lib/server/api-utils'
+import { fmtNumber, fmtPercent } from '../../../../lib/server/yahoo-finance'
 
-async function callAI(prompt) {
-  if (process.env.CEREBRAS_API_KEY) {
-    try {
-      const res = await fetch('https://api.cerebras.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.CEREBRAS_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'llama3.1-8b',
-          stream: false,
-          messages: [
-            { role: 'system', content: 'You are a senior portfolio manager. Return ONLY valid JSON with no markdown.' },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.7,
-          max_completion_tokens: 3000,
-        }),
-      })
-      const data = await res.json()
-      if (res.ok && data.choices?.[0]?.message?.content) {
-        return parseJSON(data.choices[0].message.content)
-      }
-    } catch (e) {
-      console.log('Cerebras failed, trying Groq...', e.message)
-    }
-  }
+const RATE_LIMIT = RATE_LIMIT_PRESETS.compare
 
-  if (process.env.GROQ_API_KEY) {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: 'You are a senior portfolio manager. Return ONLY valid JSON with no markdown.' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 3000,
-      }),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error?.message || 'Groq API error')
-    return parseJSON(data.choices?.[0]?.message?.content || '')
-  }
+function buildPrompt(stock1, stock2) {
+  const fmt = fmtNumber
+  const pct = fmtPercent
 
-  throw new Error('No AI API key configured')
-}
+  return {
+    system: 'You are a senior portfolio manager. Return ONLY valid JSON with no markdown.',
+    user: `Compare ${stock1.ticker} vs ${stock2.ticker} for investment.
 
-function parseJSON(text) {
-  const clean = text.replace(/```json\s*/gi, '').replace(/```/g, '').trim()
-  const match = clean.match(/\{[\s\S]*\}/)
-  if (!match) throw new Error('No valid JSON returned')
-  return JSON.parse(match[0])
-}
+${stock1.ticker} (${stock1.name}): Price ${stock1.price?.toFixed(2)} ${stock1.currency || 'USD'}, MCap ${fmt(stock1.marketCap)}, P/E ${stock1.pe?.toFixed(1) || 'N/A'}, EV/EBITDA ${stock1.evToEbitda?.toFixed(1) || 'N/A'}, Revenue ${fmt(stock1.revenue)}, Growth ${pct(stock1.revenueGrowth)}, Net Margin ${pct(stock1.profitMargin)}, ROE ${pct(stock1.roe)}, Beta ${stock1.beta?.toFixed(2) || 'N/A'}
 
-function fmt(n, d = 2) {
-  if (n == null || isNaN(n)) return 'N/A'
-  if (Math.abs(n) >= 1e12) return (n / 1e12).toFixed(d) + 'T'
-  if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(d) + 'B'
-  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(d) + 'M'
-  return n.toFixed(d)
-}
-function pct(n) { return n == null ? 'N/A' : (n * 100).toFixed(1) + '%' }
-
-export async function POST(request) {
-  try {
-    const { stock1, stock2 } = await request.json()
-    if (!stock1 || !stock2) return NextResponse.json({ error: 'Both stocks required' }, { status: 400 })
-    if (!process.env.CEREBRAS_API_KEY && !process.env.GROQ_API_KEY) {
-      return NextResponse.json({ error: 'No AI API key configured' }, { status: 500 })
-    }
-
-    const prompt = `Compare ${stock1.ticker} vs ${stock2.ticker} for investment.
-
-${stock1.ticker} (${stock1.name}): Price ${stock1.price?.toFixed(2)} ${stock1.currency||'USD'}, MCap ${fmt(stock1.marketCap)}, P/E ${stock1.pe?.toFixed(1)||'N/A'}, EV/EBITDA ${stock1.evToEbitda?.toFixed(1)||'N/A'}, Revenue ${fmt(stock1.revenue)}, Growth ${pct(stock1.revenueGrowth)}, Net Margin ${pct(stock1.profitMargin)}, ROE ${pct(stock1.roe)}, Beta ${stock1.beta?.toFixed(2)||'N/A'}
-
-${stock2.ticker} (${stock2.name}): Price ${stock2.price?.toFixed(2)} ${stock2.currency||'USD'}, MCap ${fmt(stock2.marketCap)}, P/E ${stock2.pe?.toFixed(1)||'N/A'}, EV/EBITDA ${stock2.evToEbitda?.toFixed(1)||'N/A'}, Revenue ${fmt(stock2.revenue)}, Growth ${pct(stock2.revenueGrowth)}, Net Margin ${pct(stock2.profitMargin)}, ROE ${pct(stock2.roe)}, Beta ${stock2.beta?.toFixed(2)||'N/A'}
+${stock2.ticker} (${stock2.name}): Price ${stock2.price?.toFixed(2)} ${stock2.currency || 'USD'}, MCap ${fmt(stock2.marketCap)}, P/E ${stock2.pe?.toFixed(1) || 'N/A'}, EV/EBITDA ${stock2.evToEbitda?.toFixed(1) || 'N/A'}, Revenue ${fmt(stock2.revenue)}, Growth ${pct(stock2.revenueGrowth)}, Net Margin ${pct(stock2.profitMargin)}, ROE ${pct(stock2.roe)}, Beta ${stock2.beta?.toFixed(2) || 'N/A'}
 
 Return ONLY this JSON:
 {
@@ -104,10 +50,10 @@ Return ONLY this JSON:
     { "metric": "Beta (Risk)", "stock1Value": "1.2", "stock2Value": "1.5", "advantage": "${stock1.ticker}" },
     { "metric": "Dividend Yield", "stock1Value": "1.2%", "stock2Value": "0.5%", "advantage": "${stock1.ticker}" }
   ],
-  "stock1Strengths": ["strength1", "strength2", "strength3"],
-  "stock2Strengths": ["strength1", "strength2", "strength3"],
-  "stock1Weaknesses": ["weakness1", "weakness2"],
-  "stock2Weaknesses": ["weakness1", "weakness2"],
+  "stock1Strengths": ["strength1", "strength2", "strength3" ],
+  "stock2Strengths": ["strength1", "strength2", "strength3" ],
+  "stock1Weaknesses": ["weakness1", "weakness2" ],
+  "stock2Weaknesses": ["weakness1", "weakness2" ],
   "recommendation": {
     "forGrowthInvestors": "${stock2.ticker}",
     "growthRationale": "rationale",
@@ -117,12 +63,87 @@ Return ONLY this JSON:
     "incomeRationale": "rationale"
   },
   "portfolioContext": "2-3 sentences on portfolio fit"
-}`
-
-    const data = await callAI(prompt)
-    return NextResponse.json({ success: true, data })
-  } catch (error) {
-    console.error('[compare] Error:', error.message)
-    return NextResponse.json({ error: error.message || 'Comparison failed' }, { status: 500 })
+}`,
   }
 }
+
+/**
+ * POST /api/compare
+ * Compare two stocks using AI analysis
+ */
+export async function POST(request) {
+  const clientIP = getClientIP(request)
+
+  // Rate limiting
+  const rateLimit = checkRateLimit(`compare:${clientIP}`, RATE_LIMIT)
+  const headers = createRateLimitHeaders(rateLimit)
+
+  if (!rateLimit.allowed) {
+    return createErrorResponse(
+      'Rate limit exceeded. Please try again later.',
+      429,
+      { ...headers, 'Retry-After': String(rateLimit.retryAfter) }
+    )
+  }
+
+  // Check body size
+  const sizeCheck = checkBodySize(request)
+  if (!sizeCheck.ok) {
+    return sizeCheck.response
+  }
+
+  // Parse JSON body
+  const bodyResult = await parseJSONBody(request)
+  if (!bodyResult.ok) {
+    return bodyResult.response
+  }
+
+  // Validate input
+  const validation = validateCompareRequest(bodyResult.data)
+  if (!validation.valid) {
+    return createErrorResponse(validation.error, 400, headers)
+  }
+
+  // Check AI keys
+  if (!process.env.CEREBRAS_API_KEY && !process.env.GROQ_API_KEY) {
+    return createErrorResponse('Service temporarily unavailable', 503, headers)
+  }
+
+  try {
+    const { stock1, stock2 } = validation.data
+
+    // Build and call AI
+    const prompt = buildPrompt(stock1, stock2)
+    const rawResponse = await callAIWithRetry({
+      systemPrompt: prompt.system,
+      userPrompt: prompt.user,
+      modelConfig: { maxTokens: 3000 },
+    })
+
+    // Parse JSON response
+    const comparisonData = safeParseJSON(rawResponse)
+
+    return createSuccessResponse(comparisonData, 200, headers)
+
+  } catch (error) {
+    logError('compare', error, { body: bodyResult.data?.stock1?.ticker })
+
+    // Safe error messages
+    if (error.message?.includes('JSON') || error.message?.includes('parse')) {
+      return createErrorResponse(
+        'Failed to parse AI response. Please retry.',
+        500,
+        headers
+      )
+    }
+
+    return createErrorResponse(
+      'Comparison failed. Please try again later.',
+      500,
+      headers
+    )
+  }
+}
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
