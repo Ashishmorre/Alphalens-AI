@@ -16,7 +16,16 @@
       "Bash(cp lib/server/*.js src/lib/)",
       "Bash(ls src/lib/*.js)",
       "mcp__spawner__spawner_remember",
-      "Bash(ls /mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main/src/lib/*.js /mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main/src/lib/*.ts)"
+      "Bash(ls /mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main/src/lib/*.js /mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main/src/lib/*.ts)",
+      "Bash(git -C \"/mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main\" status --porcelain)",
+      "Bash(git:*)",
+      "Bash(npx next:*)",
+      "Bash(dos2unix app/api/analyze/route.js app/api/compare/route.js app/api/stock/route.js)",
+      "Bash(npm build:*)",
+      "Bash(ls -d /mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main/src/*/)",
+      "Bash(ls -d /mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/lib/*/)",
+      "Bash(ls -la /mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main/lib/*.js)",
+      "Bash(ls -la /mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main/src/lib/*.js)"
     ]
   },
   "enableAllProjectMcpServers": true,

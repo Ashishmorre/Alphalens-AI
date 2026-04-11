@@ -2,6 +2,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { formatPrice, formatNumber, formatPct, formatMultiple, changeColor, changeSign } from '@/lib/client-utils'
 import { apiFetch, apiPost, getErrorMessage } from '@/lib/api-client'
+import { normalizeCompareData } from '@/lib/ai-normalizer'
 import { AnalysisLoader } from './LoadingCard'
 
 export default function CompareStocks() {
@@ -39,7 +40,10 @@ export default function CompareStocks() {
         stock2: data2,
       })
 
-      setComparison(comparisonData)
+    // Normalize comparison data to handle inconsistent AI formats
+    const normalizedData = normalizeCompareData(comparisonData)
+
+      setComparison(normalizedData)
       setStep('result')
     } catch (err) {
       setError(getErrorMessage(err))

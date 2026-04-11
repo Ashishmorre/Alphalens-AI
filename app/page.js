@@ -12,6 +12,7 @@ import ExportPDF from '../components/ExportPDF'
 import { AnalysisLoader, RunAnalysisButton } from '../components/LoadingCard'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { apiFetch, apiPost, getErrorMessage } from '@/lib/api-client'
+import { normalizeAIResponse } from '@/lib/ai-normalizer'
 
 const ANALYSIS_TABS = [
   { id: 'thesis', label: 'Investment Thesis', icon: '🎯' },
@@ -72,7 +73,9 @@ export default function Home() {
         analysisType: type,
         stockData,
       })
-      setAnalysisCache(prev => ({ ...prev, [cacheKey]: data }))
+    // Normalize AI response to handle inconsistent formats
+    const normalizedData = normalizeAIResponse(data, type)
+      setAnalysisCache(prev => ({ ...prev, [cacheKey]: normalizedData }))
     } catch (err) {
       setAnalysisError(getErrorMessage(err))
     } finally {
