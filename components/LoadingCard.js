@@ -74,10 +74,10 @@ function StepCycle({ steps }) {
 
 export function RunAnalysisButton({ type, onClick, loading }) {
   const icons = {
-    thesis: '🎯',
-    dcf: '📊',
-    risk: '🛡️',
-    news: '📰',
+    thesis: '●',
+    dcf: '●',
+    risk: '●',
+    news: '●',
   }
   const labels = {
     thesis: 'Generate Investment Thesis',

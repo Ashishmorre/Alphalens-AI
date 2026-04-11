@@ -4,13 +4,18 @@ import {
   checkRateLimit,
   RATE_LIMIT_PRESETS,
   createRateLimitHeaders,
-} from '@/lib/server/rate-limit.js'
-import { validateTicker } from '@/lib/server/validation.js'
+} from '@/lib/rate-limit'
+import { validateTicker } from '@/lib/validation'
 import {
   fetchStockData,
   transformYahooData,
-} from '@/lib/server/yahoo-finance.js'
-import { createSuccessResponse, createErrorResponse, logError } from '@/lib/server/api-utils.js'
+} from '@/lib/yahoo-finance'
+import { createSuccessResponse, createErrorResponse, logError } from '@/lib/api-utils'
+import {
+  SECURITY_HEADERS,
+  checkRequestSafety,
+  sanitizeInput,
+} from '@/lib/security'
 
 const RATE_LIMIT = RATE_LIMIT_PRESETS.stockData
 
@@ -19,17 +24,28 @@ const RATE_LIMIT = RATE_LIMIT_PRESETS.stockData
  * Fetch stock data from Yahoo Finance
  */
 export async function GET(request) {
+  // Security check
+  const safety = checkRequestSafety(request)
+  if (!safety.safe) {
+    return NextResponse.json(
+      { success: false, error: safety.reason },
+      { status: 403, headers: SECURITY_HEADERS }
+    )
+  }
+
   const clientIP = getClientIP(request)
 
   // Rate limiting
   const rateLimit = checkRateLimit(`stock:${clientIP}`, RATE_LIMIT)
-  const headers = createRateLimitHeaders(rateLimit)
+  const headers = { ...SECURITY_HEADERS, ...createRateLimitHeaders(rateLimit) }
 
   if (!rateLimit.allowed) {
-    return createErrorResponse(
-      'Rate limit exceeded. Please try again later.',
-      429,
-      { ...headers, 'Retry-After': String(rateLimit.retryAfter) }
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Rate limit exceeded. Please try again later.',
+      },
+      { status: 429, headers: { ...headers, 'Retry-After': String(rateLimit.retryAfter) } }
     )
   }
 
@@ -37,10 +53,16 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const rawTicker = searchParams.get('ticker')
 
+    // Sanitize input
+    const sanitizedTicker = sanitizeInput(rawTicker)
+
     // Validate ticker
-    const validation = validateTicker(rawTicker)
+    const validation = validateTicker(sanitizedTicker)
     if (!validation.valid) {
-      return createErrorResponse(validation.error, 400, headers)
+      return NextResponse.json(
+        { success: false, error: validation.error },
+        { status: 400, headers }
+      )
     }
 
     // Fetch and transform data
@@ -50,14 +72,20 @@ export async function GET(request) {
       summary: rawData.summary,
     })
 
-    return createSuccessResponse(data, 200, headers)
+    return NextResponse.json(
+      { success: true, data, error: null },
+      { status: 200, headers }
+    )
 
   } catch (error) {
     logError('stock', error, { url: request.url })
 
     // Specific error handling
     if (error.message?.includes('Rate limit')) {
-      return createErrorResponse('Rate limit exceeded. Please try again later.', 429, headers)
+      return NextResponse.json(
+        { success: false, error: 'Rate limit exceeded. Please try again later.' },
+        { status: 429, headers }
+      )
     }
 
     const status = error.message?.includes('Could not fetch') ? 404 : 500
@@ -65,7 +93,10 @@ export async function GET(request) {
       ? error.message
       : 'Failed to fetch market data. Please try again later.'
 
-    return createErrorResponse(message, status, headers)
+    return NextResponse.json(
+      { success: false, error: message },
+      { status, headers }
+    )
   }
 }
 

@@ -1,17 +1,41 @@
 'use client'
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 
 const POPULAR = ['AAPL', 'NVDA', 'MSFT', 'TSLA', 'GOOGL', 'META', 'AMZN', 'JPM', 'V', 'NFLX']
 
+// Debounce hook for input handling
+function useDebouncedValue(value, delay = 300) {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(timer)
+  }, [value, delay])
+  return debounced
+}
+
 export default function SearchBar({ onSearch, loading }) {
   const [input, setInput] = useState('')
+  const [isTyping, setIsTyping] = useState(false)
   const inputRef = useRef(null)
+
+  // Debounce typing state for visual feedback
+  useEffect(() => {
+    setIsTyping(true)
+    const timer = setTimeout(() => setIsTyping(false), 300)
+    return () => clearTimeout(timer)
+  }, [input])
 
   const handleSubmit = useCallback((e) => {
     e?.preventDefault()
     const val = input.trim().toUpperCase()
     if (val) onSearch(val)
   }, [input, onSearch])
+
+  const handleInputChange = useCallback((e) => {
+    // Prevent input that looks like SQL injection or XSS
+    const sanitized = e.target.value.replace(/[<>'"";]/g, '')
+    setInput(sanitized)
+  }, [])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleSubmit()
@@ -53,7 +77,7 @@ export default function SearchBar({ onSearch, loading }) {
             ref={inputRef}
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value.toUpperCase())}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Enter ticker symbol — AAPL, NVDA, TSLA..."
             maxLength={10}

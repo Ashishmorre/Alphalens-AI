@@ -1,8 +1,9 @@
 'use client'
-import { useState } from 'react'
-import { formatPrice, formatNumber, formatPct, formatMultiple, changeColor, changeSign } from '../lib/utils'
+import { useState, useCallback, useMemo } from 'react'
+import { formatPrice, formatNumber, formatPct, formatMultiple, changeColor, changeSign } from '@/lib/client-utils'
+import { apiFetch, apiPost, getErrorMessage } from '@/lib/api-client'
+import { normalizeCompareData } from '@/lib/ai-normalizer'
 import { AnalysisLoader } from './LoadingCard'
-import { normalizeCompareData } from '../lib/ai-normalizer'
 
 export default function CompareStocks() {
   const [ticker1, setTicker1] = useState('')
@@ -14,44 +15,42 @@ export default function CompareStocks() {
   const [error, setError] = useState('')
   const [step, setStep] = useState('input') // input | result
 
-  const handleCompare = async () => {
-    if (!ticker1.trim() || !ticker2.trim()) return
+  const handleCompare = useCallback(async () => {
+    const t1 = ticker1.trim().toUpperCase()
+    const t2 = ticker2.trim().toUpperCase()
+    if (!t1 || !t2) return
+
     setLoading(true)
     setError('')
     setComparison(null)
 
     try {
       // Fetch both stocks in parallel
-      const [r1, r2] = await Promise.all([
-        fetch(`/api/stock?ticker=${ticker1.trim().toUpperCase()}`).then(r => r.json()),
-        fetch(`/api/stock?ticker=${ticker2.trim().toUpperCase()}`).then(r => r.json()),
+      const [data1, data2] = await Promise.all([
+        apiFetch(`/api/stock?ticker=${encodeURIComponent(t1)}`),
+        apiFetch(`/api/stock?ticker=${encodeURIComponent(t2)}`),
       ])
 
-      if (r1.error) throw new Error(`${ticker1}: ${r1.error}`)
-      if (r2.error) throw new Error(`${ticker2}: ${r2.error}`)
-
-      setStock1(r1)
-      setStock2(r2)
+      setStock1(data1)
+      setStock2(data2)
 
       // Run AI comparison
-      const res = await fetch('/api/compare', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stock1: r1, stock2: r2 }),
+      const comparisonData = await apiPost('/api/compare', {
+        stock1: data1,
+        stock2: data2,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Comparison failed')
 
-      // Normalize comparison data to handle inconsistent AI formats
-      const normalizedData = normalizeCompareData(data.data)
+    // Normalize comparison data to handle inconsistent AI formats
+    const normalizedData = normalizeCompareData(comparisonData)
+
       setComparison(normalizedData)
       setStep('result')
     } catch (err) {
-      setError(err.message)
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }
-  }
+  }, [ticker1, ticker2])
 
   return (
     <div>
@@ -127,7 +126,7 @@ function CompareResults({ stock1, stock2, comparison }) {
           Overall Winner
         </div>
         <div style={{ fontFamily: 'var(--font-playfair)', fontSize: '2rem', color: isTie ? '#f59e0b' : 'var(--teal)', marginBottom: '0.5rem' }}>
-          {isTie ? '🤝 It\'s a Tie' : `🏆 ${c.winner}`}
+          {isTie ? "It's a Tie" : `● ${c.winner}`}
         </div>
         <p style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.85rem', color: 'var(--txt-secondary)', maxWidth: '520px', margin: '0 auto', lineHeight: 1.6 }}>
           {c.winnerRationale}
@@ -195,9 +194,9 @@ function CompareResults({ stock1, stock2, comparison }) {
           <SectionTitle>Who Should Buy Which?</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.875rem' }}>
             {[
-              { label: '📈 Growth Investors', ticker: c.recommendation.forGrowthInvestors, rationale: c.recommendation.growthRationale },
-              { label: '💰 Value Investors', ticker: c.recommendation.forValueInvestors, rationale: c.recommendation.valueRationale },
-              { label: '🏦 Income Investors', ticker: c.recommendation.forIncomeInvestors, rationale: c.recommendation.incomeRationale },
+              { label: 'Growth Investors', ticker: c.recommendation.forGrowthInvestors, rationale: c.recommendation.growthRationale },
+              { label: 'Value Investors', ticker: c.recommendation.forValueInvestors, rationale: c.recommendation.valueRationale },
+              { label: 'Income Investors', ticker: c.recommendation.forIncomeInvestors, rationale: c.recommendation.incomeRationale },
             ].map(({ label, ticker, rationale }) => (
               <div key={label} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.875rem', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', marginBottom: '0.35rem' }}>{label}</div>
@@ -253,7 +252,7 @@ function DimensionBar({ dim, ticker1, ticker2 }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.82rem', color: 'var(--txt-primary)' }}>{dim.dimension}</span>
           {dim.winner !== 'TIE' && (
-            <span style={{ fontSize: '0.65rem', color: 'file_path', fontFamily: 'var(--font-dm-mono)' }}>→ {dim.winner}</span>
+            <span style={{ fontSize: '0.65rem', color: 'var(--teal)', fontFamily: 'var(--font-dm-mono)' }}>→ {dim.winner}</span>
           )}
         </div>
         <span style={{ fontSize: '0.72rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', maxWidth: '280px', textAlign: 'right' }}>{dim.detail}</span>

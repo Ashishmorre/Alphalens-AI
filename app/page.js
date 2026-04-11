@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
 import Header from '../components/Header'
 import SearchBar from '../components/SearchBar'
 import StockOverview from '../components/StockOverview'
@@ -11,13 +11,14 @@ import CompareStocks from '../components/CompareStocks'
 import ExportPDF from '../components/ExportPDF'
 import { AnalysisLoader, RunAnalysisButton } from '../components/LoadingCard'
 import ErrorBoundary from '../components/ErrorBoundary'
-import { normalizeAIResponse } from '../lib/ai-normalizer'
+import { apiFetch, apiPost, getErrorMessage } from '@/lib/api-client'
+import { normalizeAIResponse } from '@/lib/ai-normalizer'
 
 const ANALYSIS_TABS = [
-  { id: 'thesis', label: 'Investment Thesis', icon: '🎯' },
-  { id: 'dcf', label: 'DCF Valuation', icon: '📊' },
-  { id: 'risk', label: 'Risk & Ratios', icon: '🛡️' },
-  { id: 'news', label: 'News Sentiment', icon: '📰' },
+  { id: 'thesis', label: 'Investment Thesis' },
+  { id: 'dcf', label: 'DCF Valuation' },
+  { id: 'risk', label: 'Risk & Ratios' },
+  { id: 'news', label: 'News Sentiment' },
 ]
 
 const NAV_TABS = ['Research', 'Compare']
@@ -45,15 +46,13 @@ export default function Home() {
     setAnalysisError('')
 
     try {
-      const res = await fetch(`/api/stock?ticker=${encodeURIComponent(ticker)}`)
-      const data = await res.json()
-
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch stock data')
+      const data = await apiFetch(`/api/stock?ticker=${encodeURIComponent(ticker)}`)
       setStockData(data)
 
+      // Smooth scroll to results
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
     } catch (err) {
-      setStockError(err.message)
+      setStockError(getErrorMessage(err))
     } finally {
       setStockLoading(false)
     }
@@ -69,23 +68,16 @@ export default function Home() {
     setAnalysisError('')
 
     try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticker: stockData.ticker,
-          analysisType: type,
-          stockData,
-        }),
+      const data = await apiPost('/api/analyze', {
+        ticker: stockData.ticker,
+        analysisType: type,
+        stockData,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Analysis failed')
-
-          // Normalize AI response to handle inconsistent formats
-    const normalizedData = normalizeAIResponse(data.data, type)
-    setAnalysisCache(prev => ({ ...prev, [cacheKey]: normalizedData }))
+    // Normalize AI response to handle inconsistent formats
+    const normalizedData = normalizeAIResponse(data, type)
+      setAnalysisCache(prev => ({ ...prev, [cacheKey]: normalizedData }))
     } catch (err) {
-      setAnalysisError(err.message)
+      setAnalysisError(getErrorMessage(err))
     } finally {
       setAnalysisLoading(false)
     }
@@ -140,7 +132,7 @@ export default function Home() {
                   onClick={() => setNavTab(tab)}
                   style={{ fontSize: '0.8rem' }}
                 >
-                  {tab === 'Research' ? '📈 ' : '⚖️ '}{tab}
+                  {tab}
                 </button>
               ))}
             </div>
@@ -158,7 +150,6 @@ export default function Home() {
                         onClick={() => handleTabChange(tab.id)}
                         style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                       >
-                        <span>{tab.icon}</span>
                         <span className="tab-label">{tab.label}</span>
                         {analysisCache[`${stockData.ticker}_${tab.id}`] && (
                           <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--teal)', display: 'inline-block', marginLeft: '2px' }} />
@@ -181,12 +172,12 @@ export default function Home() {
                     <>
                       {activeAnalysisTab === 'thesis' && (
                         <ErrorBoundary>
-                          <InvestmentThesis data={currentAnalysis} ticker={stockData.ticker} currency={stockData.currency} />
+                          <InvestmentThesis data={currentAnalysis} ticker={stockData.ticker} />
                         </ErrorBoundary>
                       )}
                       {activeAnalysisTab === 'dcf' && (
                         <ErrorBoundary>
-                          <DCFValuation data={currentAnalysis} currency={stockData.currency} />
+                          <DCFValuation data={currentAnalysis} />
                         </ErrorBoundary>
                       )}
                       {activeAnalysisTab === 'risk' && (
@@ -196,7 +187,7 @@ export default function Home() {
                       )}
                       {activeAnalysisTab === 'news' && (
                         <ErrorBoundary>
-                          <NewsSentiment data={currentAnalysis} currency={stockData.currency} />
+                          <NewsSentiment data={currentAnalysis} />
                         </ErrorBoundary>
                       )}
                     </>
@@ -257,32 +248,32 @@ export default function Home() {
 function FeatureCards() {
   const features = [
     {
-      icon: '🎯',
+      icon: '◆',
       title: 'Investment Thesis',
       desc: 'AI-generated bull, bear & base cases with price targets, moat analysis, and position sizing guidance.',
     },
     {
-      icon: '📊',
+      icon: '◆',
       title: 'DCF Valuation',
       desc: '5-year free cash flow model with WACC, terminal value, intrinsic value per share & sensitivity tables.',
     },
     {
-      icon: '🛡️',
+      icon: '◆',
       title: 'Risk & Ratios',
       desc: 'Complete ratio suite with sector benchmarks, risk matrix, leverage health & technical signals.',
     },
     {
-      icon: '📰',
+      icon: '◆',
       title: 'News Sentiment',
       desc: 'Sentiment scoring, analyst consensus, macro exposure, catalysts & 30-60 day tactical notes.',
     },
     {
-      icon: '⚖️',
+      icon: '◆',
       title: 'Compare Stocks',
       desc: 'Head-to-head comparison of any two tickers with dimension scores and investor-type recommendations.',
     },
     {
-      icon: '📄',
+      icon: '◆',
       title: 'PDF Export',
       desc: 'Download a styled research report PDF of any analysis tab to share or store for your portfolio.',
     },
