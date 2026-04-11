@@ -35,6 +35,35 @@ const DEFAULT_CASE = {
   points: [],
 }
 
+// Flexible field extractors - support multiple naming conventions
+function extractField(obj, ...keys) {
+  for (const key of keys) {
+    if (obj[key] !== undefined && obj[key] !== null) {
+      return obj[key]
+    }
+  }
+  return undefined
+}
+
+function extractFieldNested(obj, ...paths) {
+  for (const path of paths) {
+    const parts = path.split('.')
+    let current = obj
+    for (const part of parts) {
+      if (current && typeof current === 'object') {
+        current = current[part]
+      } else {
+        current = undefined
+        break
+      }
+    }
+    if (current !== undefined && current !== null) {
+      return current
+    }
+  }
+  return undefined
+}
+
 export function normalizeThesisData(raw) {
   if (!raw) return { ...DEFAULT_THESIS_DATA }
 
@@ -63,24 +92,43 @@ export function normalizeThesisData(raw) {
     return { ...DEFAULT_THESIS_DATA }
   }
 
+  // Flexible field extraction with multiple key variants
+  const verdict = extractField(data, 'verdict', 'investmentVerdict', 'recommendation')
+  const confidence = extractField(data, 'confidence', 'confidenceScore', 'confidenceLevel')
+  const targetPrice = extractField(data, 'targetPrice', 'target', 'priceTarget', 'fairValue')
+  const upsideDownside = extractField(data, 'upsideDownside', 'upsideDownside', 'upside')
+  const timeHorizon = extractField(data, 'timeHorizon', 'timeHorizon', 'horizon', 'timeline')
+  const thesisSummary = extractField(data, 'thesisSummary', 'summary', 'investmentSummary', 'analysis')
+  const bullCase = extractField(data, 'bullCase', 'bull_case', 'bull', 'bullScenario', 'optimisticCase')
+  const bearCase = extractField(data, 'bearCase', 'bear_case', 'bear', 'bearScenario', 'pessimisticCase')
+  const baseCase = extractField(data, 'baseCase', 'base_case', 'base', 'baseScenario', 'neutralCase')
+  const keyDrivers = extractField(data, 'keyDrivers', 'key_drivers', 'drivers', 'investmentDrivers')
+  const moatRating = extractField(data, 'moatRating', 'moat_rating', 'moatScore', 'competitiveMoat')
+  const moatType = extractField(data, 'moatType', 'moat_type', 'moat', 'competitiveAdvantage')
+  const growthQuality = extractField(data, 'growthQuality', 'growth_quality', 'growth')
+  const catalysts = extractField(data, 'catalysts', 'keyCatalysts', 'catalyst')
+  const risks = extractField(data, 'risks', 'riskFactors', 'keyRisks')
+  const positionSizing = extractField(data, 'positionSizing', 'position_size', 'sizing', 'position')
+  const comparisonPeers = extractField(data, 'comparisonPeers', 'comparison_peers', 'peers', 'comparableCompanies')
+
   return {
-    verdict: normalizeVerdict(data.verdict),
-    confidence: normalizeNumber(data.confidence, 0, 100, 50),
-    targetPrice: normalizePrice(data.targetPrice),
-    upsideDownside: normalizeNumber(data.upsideDownside, -100, 100, 0),
-    timeHorizon: normalizeString(data.timeHorizon, DEFAULT_THESIS_DATA.timeHorizon),
-    thesisSummary: normalizeString(data.thesisSummary, DEFAULT_THESIS_DATA.thesisSummary),
-    bullCase: normalizeCase(data.bullCase),
-    bearCase: normalizeCase(data.bearCase),
-    baseCase: normalizeCase(data.baseCase),
-    keyDrivers: normalizeArray(data.keyDrivers).map(normalizeDriver),
-    moatRating: normalizeNumber(data.moatRating, 0, 5, 0),
-    moatType: normalizeString(data.moatType, DEFAULT_THESIS_DATA.moatType),
-    growthQuality: normalizeString(data.growthQuality, DEFAULT_THESIS_DATA.growthQuality),
-    catalysts: normalizeStringArray(data.catalysts),
-    risks: normalizeStringArray(data.risks),
-    positionSizing: normalizeString(data.positionSizing, DEFAULT_THESIS_DATA.positionSizing),
-    comparisonPeers: normalizeStringArray(data.comparisonPeers),
+    verdict: normalizeVerdict(verdict),
+    confidence: normalizeNumber(confidence, 0, 100, 50),
+    targetPrice: normalizePrice(targetPrice),
+    upsideDownside: normalizeNumber(upsideDownside, -100, 100, 0),
+    timeHorizon: normalizeString(timeHorizon, DEFAULT_THESIS_DATA.timeHorizon),
+    thesisSummary: normalizeString(thesisSummary, DEFAULT_THESIS_DATA.thesisSummary),
+    bullCase: normalizeCase(bullCase),
+    bearCase: normalizeCase(bearCase),
+    baseCase: normalizeCase(baseCase),
+    keyDrivers: normalizeArray(keyDrivers).map(normalizeDriver),
+    moatRating: normalizeNumber(moatRating, 0, 5, 0),
+    moatType: normalizeString(moatType, DEFAULT_THESIS_DATA.moatType),
+    growthQuality: normalizeString(growthQuality, DEFAULT_THESIS_DATA.growthQuality),
+    catalysts: normalizeStringArray(catalysts),
+    risks: normalizeStringArray(risks),
+    positionSizing: normalizeString(positionSizing, DEFAULT_THESIS_DATA.positionSizing),
+    comparisonPeers: normalizeStringArray(comparisonPeers),
   }
 }
 
@@ -355,11 +403,18 @@ function normalizeSentimentLabel(val) {
 
 function normalizeCase(val) {
   if (!val || typeof val !== 'object') return { ...DEFAULT_CASE }
+
+  // Support flexible field names for case data
+  const title = extractField(val, 'title', 'caseTitle', 'name', 'scenarioName') || DEFAULT_CASE.title
+  const targetPrice = extractField(val, 'targetPrice', 'target', 'priceTarget', 'price', 'target_price') || null
+  const probability = extractField(val, 'probability', 'prob', 'chance', 'likelihood') || 33
+  const points = extractField(val, 'points', 'keyPoints', 'bulletPoints', 'highlights', 'details') || []
+
   return {
-    title: normalizeString(val.title, DEFAULT_CASE.title),
-    targetPrice: normalizePrice(val.targetPrice),
-    probability: normalizeNumber(val.probability, 0, 100, 33),
-    points: normalizeStringArray(val.points),
+    title: normalizeString(title, DEFAULT_CASE.title),
+    targetPrice: normalizePrice(targetPrice),
+    probability: normalizeNumber(probability, 0, 100, 33),
+    points: normalizeStringArray(points),
   }
 }
 
