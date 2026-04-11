@@ -1,20 +1,20 @@
+import { NextResponse } from 'next/server'
 import {
   getClientIP,
   checkRateLimit,
   RATE_LIMIT_PRESETS,
   createRateLimitHeaders,
-} from '../../../../lib/server/rate-limit'
-import { validateCompareRequest } from '../../../../lib/server/validation'
-import { safeParseJSON } from '../../../../lib/server/json-parser'
+} from '@/lib/rate-limit'
+import { validateCompareRequest } from '@/lib/validation'
+import { safeParseJSON } from '@/lib/json-parser'
 import {
   checkBodySize,
   parseJSONBody,
-  createSuccessResponse,
-  createErrorResponse,
-  callAIWithRetry,
   logError,
-} from '../../../../lib/server/api-utils'
-import { fmtNumber, fmtPercent } from '../../../../lib/server/yahoo-finance'
+  callAIWithRetry,
+} from '@/lib/api-utils'
+import { fmtNumber, fmtPercent } from '@/lib/yahoo-finance'
+import { SECURITY_HEADERS, checkRequestSafety } from '@/lib/security'
 
 const RATE_LIMIT = RATE_LIMIT_PRESETS.compare
 
@@ -72,41 +72,64 @@ Return ONLY this JSON:
  * Compare two stocks using AI analysis
  */
 export async function POST(request) {
+  // Security check
+  const safety = checkRequestSafety(request)
+  if (!safety.safe) {
+    return NextResponse.json(
+      { success: false, error: safety.reason },
+      { status: 403, headers: SECURITY_HEADERS }
+    )
+  }
+
   const clientIP = getClientIP(request)
 
   // Rate limiting
   const rateLimit = checkRateLimit(`compare:${clientIP}`, RATE_LIMIT)
-  const headers = createRateLimitHeaders(rateLimit)
+  const headers = { ...SECURITY_HEADERS, ...createRateLimitHeaders(rateLimit) }
 
   if (!rateLimit.allowed) {
-    return createErrorResponse(
-      'Rate limit exceeded. Please try again later.',
-      429,
-      { ...headers, 'Retry-After': String(rateLimit.retryAfter) }
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Rate limit exceeded. Please try again later.',
+      },
+      { status: 429, headers: { ...headers, 'Retry-After': String(rateLimit.retryAfter) } }
     )
   }
 
   // Check body size
   const sizeCheck = checkBodySize(request)
   if (!sizeCheck.ok) {
-    return sizeCheck.response
+    return NextResponse.json(
+      { success: false, error: 'Request body too large' },
+      { status: 413, headers }
+    )
   }
 
   // Parse JSON body
   const bodyResult = await parseJSONBody(request)
   if (!bodyResult.ok) {
-    return bodyResult.response
+    return NextResponse.json(
+      { success: false, error: 'Invalid JSON in request body' },
+      { status: 400, headers }
+    )
   }
 
   // Validate input
   const validation = validateCompareRequest(bodyResult.data)
   if (!validation.valid) {
-    return createErrorResponse(validation.error, 400, headers)
+    return NextResponse.json(
+      { success: false, error: validation.error },
+      { status: 400, headers }
+    )
   }
 
   // Check AI keys
   if (!process.env.CEREBRAS_API_KEY && !process.env.GROQ_API_KEY) {
-    return createErrorResponse('Service temporarily unavailable', 503, headers)
+    return NextResponse.json(
+      { success: false, error: 'Service temporarily unavailable' },
+      { status: 503, headers }
+    )
   }
 
   try {
@@ -123,24 +146,24 @@ export async function POST(request) {
     // Parse JSON response
     const comparisonData = safeParseJSON(rawResponse)
 
-    return createSuccessResponse(comparisonData, 200, headers)
-
+    return NextResponse.json(
+      { success: true, data: comparisonData, error: null },
+      { status: 200, headers }
+    )
   } catch (error) {
     logError('compare', error, { body: bodyResult.data?.stock1?.ticker })
 
     // Safe error messages
     if (error.message?.includes('JSON') || error.message?.includes('parse')) {
-      return createErrorResponse(
-        'Failed to parse AI response. Please retry.',
-        500,
-        headers
+      return NextResponse.json(
+        { success: false, error: 'Failed to parse AI response. Please retry.' },
+        { status: 500, headers }
       )
     }
 
-    return createErrorResponse(
-      'Comparison failed. Please try again later.',
-      500,
-      headers
+    return NextResponse.json(
+      { success: false, error: 'Comparison failed. Please try again later.' },
+      { status: 500, headers }
     )
   }
 }

@@ -1,5 +1,5 @@
 'use client'
-import { formatNumber, formatPrice, formatVolume, formatMultiple, formatPct, changeColor, changeSign, truncate, getExchangeFlag, getCurrencySymbol } from '../lib/utils'
+import { formatNumber, formatPrice, formatVolume, formatMultiple, formatPct, changeColor, changeSign, truncate, getExchangeFlag, getCurrencySymbol } from '@/lib/client-utils'
 
 export default function StockOverview({ data, onCompare }) {
   if (!data) return null

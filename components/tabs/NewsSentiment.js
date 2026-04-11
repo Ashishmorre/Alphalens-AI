@@ -1,5 +1,5 @@
 'use client'
-import { sentimentColor, formatPrice } from '../../lib/utils'
+import { sentimentColor, formatPrice } from '@/lib/client-utils'
 
 export default function NewsSentiment({ data }) {
   if (!data) return null

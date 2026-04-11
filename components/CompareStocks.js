@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { formatPrice, formatNumber, formatPct, formatMultiple, changeColor, changeSign } from '../lib/utils'
+import { formatPrice, formatNumber, formatPct, formatMultiple, changeColor, changeSign } from '@/lib/client-utils'
 import { AnalysisLoader } from './LoadingCard'
 
 export default function CompareStocks() {
