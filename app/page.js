@@ -10,12 +10,13 @@ import NewsSentiment from '../components/tabs/NewsSentiment'
 import CompareStocks from '../components/CompareStocks'
 import ExportPDF from '../components/ExportPDF'
 import { AnalysisLoader, RunAnalysisButton } from '../components/LoadingCard'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 const ANALYSIS_TABS = [
   { id: 'thesis', label: 'Investment Thesis', icon: '🎯' },
-  { id: 'dcf',    label: 'DCF Valuation',     icon: '📊' },
-  { id: 'risk',   label: 'Risk & Ratios',     icon: '🛡️' },
-  { id: 'news',   label: 'News Sentiment',    icon: '📰' },
+  { id: 'dcf', label: 'DCF Valuation', icon: '📊' },
+  { id: 'risk', label: 'Risk & Ratios', icon: '🛡️' },
+  { id: 'news', label: 'News Sentiment', icon: '📰' },
 ]
 
 const NAV_TABS = ['Research', 'Compare']
@@ -28,7 +29,7 @@ export default function Home() {
   const [stockError, setStockError] = useState('')
 
   const [activeAnalysisTab, setActiveAnalysisTab] = useState('thesis')
-  const [analysisCache, setAnalysisCache] = useState({})  // { ticker_type: data }
+  const [analysisCache, setAnalysisCache] = useState({})
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
 
@@ -49,7 +50,6 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || 'Failed to fetch stock data')
       setStockData(data)
 
-      // Scroll to results
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
     } catch (err) {
       setStockError(err.message)
@@ -62,7 +62,7 @@ export default function Home() {
   const handleRunAnalysis = useCallback(async (type) => {
     if (!stockData) return
     const cacheKey = `${stockData.ticker}_${type}`
-    if (analysisCache[cacheKey]) return // already cached
+    if (analysisCache[cacheKey]) return
 
     setAnalysisLoading(true)
     setAnalysisError('')
@@ -88,16 +88,9 @@ export default function Home() {
     }
   }, [stockData, analysisCache])
 
-  // When tab changes, auto-run if not cached
   const handleTabChange = (tabId) => {
     setActiveAnalysisTab(tabId)
     setAnalysisError('')
-    if (stockData) {
-      const cacheKey = `${stockData.ticker}_${tabId}`
-      if (!analysisCache[cacheKey]) {
-        // Don't auto-run, let user click — to avoid accidental API overuse
-      }
-    }
   }
 
   const currentCacheKey = stockData ? `${stockData.ticker}_${activeAnalysisTab}` : null
@@ -108,10 +101,8 @@ export default function Home() {
       <Header />
 
       <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 1rem 4rem' }}>
-        {/* Hero search area */}
         <SearchBar onSearch={handleSearch} loading={stockLoading} />
 
-        {/* Stock loading indicator */}
         {stockLoading && (
           <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', fontSize: '0.875rem' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -124,7 +115,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Stock error */}
         {stockError && !stockLoading && (
           <div className="card animate-fade-in" style={{ padding: '1.25rem 1.5rem', borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.05)', maxWidth: '600px', margin: '1rem auto' }}>
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
@@ -137,10 +127,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* Main results area */}
         {stockData && !stockLoading && (
           <div ref={resultsRef} className="animate-slide-up">
-            {/* Nav tabs: Research / Compare */}
             <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid rgba(0,212,170,0.1)', marginBottom: '1.5rem' }}>
               {NAV_TABS.map(tab => (
                 <button
@@ -156,10 +144,8 @@ export default function Home() {
 
             {navTab === 'Research' && (
               <>
-                {/* Stock overview */}
                 <StockOverview data={stockData} />
 
-                {/* Analysis tabs + export */}
                 <div style={{ marginBottom: '0.875rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid rgba(0,212,170,0.1)', flex: 1 }}>
                     {ANALYSIS_TABS.map(tab => (
@@ -171,7 +157,6 @@ export default function Home() {
                       >
                         <span>{tab.icon}</span>
                         <span className="tab-label">{tab.label}</span>
-                        {/* Cache indicator */}
                         {analysisCache[`${stockData.ticker}_${tab.id}`] && (
                           <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--teal)', display: 'inline-block', marginLeft: '2px' }} />
                         )}
@@ -179,7 +164,6 @@ export default function Home() {
                     ))}
                   </div>
 
-                  {/* Export button */}
                   <ExportPDF
                     stockData={stockData}
                     analysisData={currentAnalysis}
@@ -187,16 +171,31 @@ export default function Home() {
                   />
                 </div>
 
-                {/* Analysis panel */}
                 <div className="card" style={{ minHeight: '300px', padding: analysisLoading || !currentAnalysis ? '0' : '1.5rem' }}>
                   {analysisLoading ? (
                     <AnalysisLoader type={activeAnalysisTab} />
                   ) : currentAnalysis ? (
                     <>
-                      {activeAnalysisTab === 'thesis' && <InvestmentThesis data={currentAnalysis} ticker={stockData.ticker} />}
-                      {activeAnalysisTab === 'dcf'    && <DCFValuation data={currentAnalysis} />}
-                      {activeAnalysisTab === 'risk'   && <RiskRatios data={currentAnalysis} />}
-                      {activeAnalysisTab === 'news'   && <NewsSentiment data={currentAnalysis} />}
+                      {activeAnalysisTab === 'thesis' && (
+                        <ErrorBoundary>
+                          <InvestmentThesis data={currentAnalysis} ticker={stockData.ticker} />
+                        </ErrorBoundary>
+                      )}
+                      {activeAnalysisTab === 'dcf' && (
+                        <ErrorBoundary>
+                          <DCFValuation data={currentAnalysis} />
+                        </ErrorBoundary>
+                      )}
+                      {activeAnalysisTab === 'risk' && (
+                        <ErrorBoundary>
+                          <RiskRatios data={currentAnalysis} />
+                        </ErrorBoundary>
+                      )}
+                      {activeAnalysisTab === 'news' && (
+                        <ErrorBoundary>
+                          <NewsSentiment data={currentAnalysis} />
+                        </ErrorBoundary>
+                      )}
                     </>
                   ) : (
                     <RunAnalysisButton
@@ -207,7 +206,6 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* Analysis error */}
                 {analysisError && !analysisLoading && (
                   <div className="card animate-fade-in" style={{ marginTop: '0.875rem', padding: '1rem 1.25rem', borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.04)' }}>
                     <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
@@ -230,13 +228,11 @@ export default function Home() {
           </div>
         )}
 
-        {/* Empty state with feature cards */}
         {!stockData && !stockLoading && !stockError && (
           <FeatureCards />
         )}
       </main>
 
-      {/* Footer */}
       <footer className="no-print" style={{ borderTop: '1px solid rgba(0,212,170,0.07)', padding: '1.5rem', textAlign: 'center' }}>
         <p style={{ fontSize: '0.72rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', lineHeight: 1.6 }}>
           AlphaLens AI · Powered by Claude &amp; Yahoo Finance · For informational purposes only — not investment advice.
@@ -245,7 +241,6 @@ export default function Home() {
         </p>
       </footer>
 
-      {/* Mobile tab label hide */}
       <style>{`
         @media (max-width: 640px) {
           .tab-label { display: none; }
