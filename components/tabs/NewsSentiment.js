@@ -1,7 +1,7 @@
 'use client'
 import { sentimentColor, formatPrice } from '@/lib/client-utils'
 
-export default function NewsSentiment({ data }) {
+export default function NewsSentiment({ data, currency }) {
   if (!data) return null
   const d = data
   const score = d.sentimentScore || 50
@@ -40,7 +40,7 @@ export default function NewsSentiment({ data }) {
                 {d.analystConsensus.rating}
               </div>
               <div style={{ fontSize: '0.82rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', marginBottom: '0.75rem' }}>
-                Target: <span style={{ color: 'var(--txt-primary)' }}>{formatPrice(d.analystConsensus.meanTarget)}</span>
+                Target: <span style={{ color: 'var(--txt-primary)' }}>{formatPrice(d.analystConsensus.meanTarget, currency)}</span>
                 {d.analystConsensus.upside != null && (
                   <span style={{ color: d.analystConsensus.upside >= 0 ? 'var(--gain)' : 'var(--loss)', marginLeft: '0.4rem' }}>
                     ({d.analystConsensus.upside >= 0 ? '+' : ''}{d.analystConsensus.upside?.toFixed(1)}%)

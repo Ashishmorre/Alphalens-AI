@@ -70,7 +70,7 @@ export default function StockOverview({ data, onCompare }) {
           {/* Right: Key stats grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', minWidth: '280px', maxWidth: '480px', flex: '1 1 280px' }}>
             {[
-              { label: 'Market Cap', value: formatNumber(data.marketCap) },
+              { label: 'Market Cap', value: formatNumber(data.marketCap, 2, data.currency) },
               { label: 'P/E (TTM)', value: formatMultiple(data.pe) },
               { label: 'Forward P/E', value: formatMultiple(data.forwardPE) },
               { label: 'EV/EBITDA', value: formatMultiple(data.evToEbitda) },
@@ -98,8 +98,8 @@ export default function StockOverview({ data, onCompare }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.625rem' }}>
         {[
           { label: 'Revenue', value: formatNumber(data.revenue) },
-          { label: 'EBITDA', value: formatNumber(data.ebitda) },
-          { label: 'Free Cash Flow', value: formatNumber(data.freeCashFlow) },
+          { label: 'EBITDA', value: formatNumber(data.ebitda, 2, data.currency) },
+          { label: 'Free Cash Flow', value: formatNumber(data.freeCashFlow, 2, data.currency) },
           { label: 'Gross Margin', value: formatPct(data.grossMargin) },
           { label: 'Net Margin', value: formatPct(data.profitMargin) },
           { label: 'ROE', value: formatPct(data.roe) },

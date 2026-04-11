@@ -1,7 +1,7 @@
 'use client'
 import { formatNumber, formatPrice } from '@/lib/client-utils'
 
-export default function DCFValuation({ data }) {
+export default function DCFValuation({ data, currency }) {
   if (!data) return null
   const d = data
 
@@ -19,11 +19,11 @@ export default function DCFValuation({ data }) {
               DCF Intrinsic Value
             </div>
             <div style={{ fontFamily: 'var(--font-playfair)', fontSize: '2.5rem', color: 'var(--txt-primary)', lineHeight: 1 }}>
-              {formatPrice(d.intrinsicValuePerShare)}
+              {formatPrice(d.intrinsicValuePerShare, currency)}
             </div>
             <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.9rem', color: 'var(--txt-secondary)' }}>
-                Current: {formatPrice(d.currentPrice)}
+                Current: {formatPrice(d.currentPrice, currency)}
               </span>
               <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1rem', fontWeight: 600, color: ratingColor }}>
                 {d.upside >= 0 ? '+' : ''}{d.upside?.toFixed(1)}% {d.upside >= 0 ? 'upside' : 'downside'}
@@ -135,7 +135,7 @@ export default function DCFValuation({ data }) {
                       const cellClass = getSensitivityClass(val, d.currentPrice)
                       return (
                         <td key={ci} className={cellClass} style={{ textAlign: 'right', fontWeight: 500 }}>
-                          {formatPrice(val)}
+                          {formatPrice(val, currency)}
                         </td>
                       )
                     })}

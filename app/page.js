@@ -172,12 +172,12 @@ export default function Home() {
                     <>
                       {activeAnalysisTab === 'thesis' && (
                         <ErrorBoundary>
-                          <InvestmentThesis data={currentAnalysis} ticker={stockData.ticker} />
+                          <InvestmentThesis data={currentAnalysis} ticker={stockData.ticker} currency={stockData.currency} />
                         </ErrorBoundary>
                       )}
                       {activeAnalysisTab === 'dcf' && (
                         <ErrorBoundary>
-                          <DCFValuation data={currentAnalysis} />
+                          <DCFValuation data={currentAnalysis} currency={stockData.currency} />
                         </ErrorBoundary>
                       )}
                       {activeAnalysisTab === 'risk' && (
@@ -187,7 +187,7 @@ export default function Home() {
                       )}
                       {activeAnalysisTab === 'news' && (
                         <ErrorBoundary>
-                          <NewsSentiment data={currentAnalysis} />
+                          <NewsSentiment data={currentAnalysis} currency={stockData.currency} />
                         </ErrorBoundary>
                       )}
                     </>

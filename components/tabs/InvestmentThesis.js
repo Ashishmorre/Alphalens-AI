@@ -1,7 +1,7 @@
 'use client'
 import { verdictClass, formatPrice, impactColor } from '@/lib/client-utils'
 
-export default function InvestmentThesis({ data, ticker }) {
+export default function InvestmentThesis({ data, ticker, currency }) {
   if (!data) return null
   const d = data
 
@@ -22,7 +22,7 @@ export default function InvestmentThesis({ data, ticker }) {
               </span>
               <div>
                 <div style={{ fontFamily: 'var(--font-playfair)', fontSize: '1.1rem', color: 'var(--txt-primary)', marginBottom: '0.15rem' }}>
-                  Target: {formatPrice(d.targetPrice)}
+                  Target: {formatPrice(d.targetPrice, currency)}
                   <span style={{ fontSize: '0.85rem', color: d.upsideDownside >= 0 ? 'var(--gain)' : 'var(--loss)', marginLeft: '0.5rem' }}>
                     ({d.upsideDownside >= 0 ? '+' : ''}{d.upsideDownside?.toFixed(1)}%)
                   </span>
@@ -74,6 +74,7 @@ export default function InvestmentThesis({ data, ticker }) {
             bg="rgba(34,197,94,0.05)"
             border="rgba(34,197,94,0.18)"
             icon="↑"
+            currency={currency}
           />
         )}
         {/* Bear Case */}
@@ -88,6 +89,7 @@ export default function InvestmentThesis({ data, ticker }) {
             bg="rgba(239,68,68,0.05)"
             border="rgba(239,68,68,0.18)"
             icon="↓"
+            currency={currency}
           />
         )}
         {/* Base Case */}
@@ -102,6 +104,7 @@ export default function InvestmentThesis({ data, ticker }) {
             bg="rgba(245,158,11,0.05)"
             border="rgba(245,158,11,0.18)"
             icon="→"
+            currency={currency}
           />
         )}
       </div>
@@ -196,7 +199,7 @@ export default function InvestmentThesis({ data, ticker }) {
   )
 }
 
-function CaseCard({ label, title, points, target, probability, color, bg, border, icon }) {
+function CaseCard({ label, title, points, target, probability, color, bg, border, icon, currency }) {
   return (
     <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: '8px', padding: '1.25rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
@@ -211,7 +214,7 @@ function CaseCard({ label, title, points, target, probability, color, bg, border
       )}
       {target && (
         <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.1rem', color, fontWeight: 600, marginBottom: '0.625rem' }}>
-          Target: {formatPrice(target)}
+          Target: {formatPrice(target, currency)}
         </div>
       )}
       {points?.length > 0 && (
