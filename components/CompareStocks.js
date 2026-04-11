@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { formatPrice, formatNumber, formatPct, formatMultiple, changeColor, changeSign } from '@/lib/client-utils'
+import { apiFetch, apiPost, getErrorMessage } from '@/lib/api-client'
 import { AnalysisLoader } from './LoadingCard'
 
 export default function CompareStocks() {
@@ -13,42 +14,39 @@ export default function CompareStocks() {
   const [error, setError] = useState('')
   const [step, setStep] = useState('input') // input | result
 
-  const handleCompare = async () => {
-    if (!ticker1.trim() || !ticker2.trim()) return
+  const handleCompare = useCallback(async () => {
+    const t1 = ticker1.trim().toUpperCase()
+    const t2 = ticker2.trim().toUpperCase()
+    if (!t1 || !t2) return
+
     setLoading(true)
     setError('')
     setComparison(null)
 
     try {
       // Fetch both stocks in parallel
-      const [r1, r2] = await Promise.all([
-        fetch(`/api/stock?ticker=${ticker1.trim().toUpperCase()}`).then(r => r.json()),
-        fetch(`/api/stock?ticker=${ticker2.trim().toUpperCase()}`).then(r => r.json()),
+      const [data1, data2] = await Promise.all([
+        apiFetch(`/api/stock?ticker=${encodeURIComponent(t1)}`),
+        apiFetch(`/api/stock?ticker=${encodeURIComponent(t2)}`),
       ])
 
-      if (r1.error) throw new Error(`${ticker1}: ${r1.error}`)
-      if (r2.error) throw new Error(`${ticker2}: ${r2.error}`)
-
-      setStock1(r1)
-      setStock2(r2)
+      setStock1(data1)
+      setStock2(data2)
 
       // Run AI comparison
-      const res = await fetch('/api/compare', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stock1: r1, stock2: r2 }),
+      const comparisonData = await apiPost('/api/compare', {
+        stock1: data1,
+        stock2: data2,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Comparison failed')
 
-      setComparison(data.data)
+      setComparison(comparisonData)
       setStep('result')
     } catch (err) {
-      setError(err.message)
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }
-  }
+  }, [ticker1, ticker2])
 
   return (
     <div>

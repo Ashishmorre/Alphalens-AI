@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
 import Header from '../components/Header'
 import SearchBar from '../components/SearchBar'
 import StockOverview from '../components/StockOverview'
@@ -11,6 +11,7 @@ import CompareStocks from '../components/CompareStocks'
 import ExportPDF from '../components/ExportPDF'
 import { AnalysisLoader, RunAnalysisButton } from '../components/LoadingCard'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { apiFetch, apiPost, getErrorMessage } from '@/lib/api-client'
 
 const ANALYSIS_TABS = [
   { id: 'thesis', label: 'Investment Thesis', icon: '🎯' },
@@ -44,15 +45,13 @@ export default function Home() {
     setAnalysisError('')
 
     try {
-      const res = await fetch(`/api/stock?ticker=${encodeURIComponent(ticker)}`)
-      const data = await res.json()
-
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch stock data')
+      const data = await apiFetch(`/api/stock?ticker=${encodeURIComponent(ticker)}`)
       setStockData(data)
 
+      // Smooth scroll to results
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
     } catch (err) {
-      setStockError(err.message)
+      setStockError(getErrorMessage(err))
     } finally {
       setStockLoading(false)
     }
@@ -68,21 +67,14 @@ export default function Home() {
     setAnalysisError('')
 
     try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticker: stockData.ticker,
-          analysisType: type,
-          stockData,
-        }),
+      const data = await apiPost('/api/analyze', {
+        ticker: stockData.ticker,
+        analysisType: type,
+        stockData,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Analysis failed')
-
-      setAnalysisCache(prev => ({ ...prev, [cacheKey]: data.data }))
+      setAnalysisCache(prev => ({ ...prev, [cacheKey]: data }))
     } catch (err) {
-      setAnalysisError(err.message)
+      setAnalysisError(getErrorMessage(err))
     } finally {
       setAnalysisLoading(false)
     }
