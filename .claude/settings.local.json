@@ -11,7 +11,12 @@
       "Bash(ls -la lib/server/*.js src/lib/server/*.js)",
       "Bash(git checkout:*)",
       "Bash(wc -l lib/server/*.js)",
-      "Bash(ls -la lib/server/*.js)"
+      "Bash(ls -la lib/server/*.js)",
+      "Bash(ls -la ./lib/server/*.js)",
+      "Bash(cp lib/server/*.js src/lib/)",
+      "Bash(ls src/lib/*.js)",
+      "mcp__spawner__spawner_remember",
+      "Bash(ls /mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main/src/lib/*.js /mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main/src/lib/*.ts)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -1,5 +1,5 @@
 'use client'
-import { verdictClass, formatPrice, impactColor } from '../../lib/utils'
+import { verdictClass, formatPrice, impactColor } from '@/lib/client-utils'
 
 export default function InvestmentThesis({ data, ticker }) {
   if (!data) return null

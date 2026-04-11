@@ -3,6 +3,9 @@
  * Shared helpers for fetching stock data from Yahoo Finance
  */
 
+import { getOrSet, CACHE_TTL } from './cache.js'
+import { dedupe } from './dedupe.js'
+
 // Standard headers for Yahoo Finance requests
 export const YAHOO_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -119,6 +122,19 @@ async function fetchFallbackChartData(ticker) {
  * @throws {Error} If data cannot be fetched
  */
 export async function fetchStockData(ticker) {
+  // Use caching + deduplication for stock data
+  return getOrSet(
+    `yahoo:${ticker}`,
+    () => dedupe(`fetch:${ticker}`, () => fetchStockDataInternal(ticker)),
+    CACHE_TTL.stockData
+  )
+}
+
+/**
+ * Internal implementation of stock data fetching
+ * (Actual logic extracted for caching wrapper)
+ */
+async function fetchStockDataInternal(ticker) {
   const { crumb, cookie } = await getYahooCrumb()
   const authHeaders = { ...YAHOO_HEADERS, ...(cookie ? { Cookie: cookie } : {}) }
 

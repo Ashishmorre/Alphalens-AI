@@ -1,5 +1,5 @@
 'use client'
-import { formatNumber, formatPrice } from '../../lib/utils'
+import { formatNumber, formatPrice } from '@/lib/client-utils'
 
 export default function DCFValuation({ data }) {
   if (!data) return null
