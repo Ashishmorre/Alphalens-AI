@@ -1,5 +1,4 @@
 import './globals.css'
-import { Analytics } from '@vercel/analytics/next'
 
 export const metadata = {
   title: 'AlphaLens AI — Institutional-Grade Stock Analysis',
@@ -33,7 +32,6 @@ export default function RootLayout({ children }) {
         <div style={{ position: 'relative', zIndex: 1 }}>
           {children}
         </div>
-        <Analytics />
       </body>
     </html>
   )
