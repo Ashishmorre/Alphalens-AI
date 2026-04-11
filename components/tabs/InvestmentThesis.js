@@ -1,0 +1,250 @@
+'use client'
+import { verdictClass, formatPrice, impactColor } from '../../lib/utils'
+
+export default function InvestmentThesis({ data, ticker }) {
+  if (!data) return null
+  const d = data
+
+  const moatStars = Math.round(d.moatRating || 0)
+
+  return (
+    <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Verdict banner */}
+      <div className="card card-glow" style={{ padding: '1.5rem 2rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--txt-muted)', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'var(--font-dm-mono)', marginBottom: '0.5rem' }}>
+              AI Investment Verdict
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <span className={verdictClass(d.verdict)} style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.5rem', fontWeight: 700, padding: '0.3rem 1rem', borderRadius: '6px', letterSpacing: '0.1em' }}>
+                {d.verdict}
+              </span>
+              <div>
+                <div style={{ fontFamily: 'var(--font-playfair)', fontSize: '1.1rem', color: 'var(--txt-primary)', marginBottom: '0.15rem' }}>
+                  Target: {formatPrice(d.targetPrice)}
+                  <span style={{ fontSize: '0.85rem', color: d.upsideDownside >= 0 ? 'var(--gain)' : 'var(--loss)', marginLeft: '0.5rem' }}>
+                    ({d.upsideDownside >= 0 ? '+' : ''}{d.upsideDownside?.toFixed(1)}%)
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)' }}>
+                  {d.timeHorizon} · Confidence: {d.confidence}%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Confidence meter */}
+          <div style={{ minWidth: '180px' }}>
+            <div style={{ fontSize: '0.68rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+              Analyst Confidence
+            </div>
+            <div className="progress-bar" style={{ height: '8px', marginBottom: '0.3rem' }}>
+              <div className="progress-fill" style={{ width: `${d.confidence}%` }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)' }}>
+              <span>Low</span>
+              <span style={{ color: 'var(--teal)' }}>{d.confidence}%</span>
+              <span>High</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary */}
+        {d.thesisSummary && (
+          <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(0,212,170,0.08)' }}>
+            <p style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.875rem', color: 'var(--txt-secondary)', lineHeight: 1.7 }}>
+              {d.thesisSummary}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Bull / Bear / Base cases */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.875rem' }}>
+        {/* Bull Case */}
+        {d.bullCase && (
+          <CaseCard
+            label="Bull Case"
+            title={d.bullCase.title}
+            points={d.bullCase.points}
+            target={d.bullCase.targetPrice}
+            probability={d.bullCase.probability}
+            color="#22c55e"
+            bg="rgba(34,197,94,0.05)"
+            border="rgba(34,197,94,0.18)"
+            icon="↑"
+          />
+        )}
+        {/* Bear Case */}
+        {d.bearCase && (
+          <CaseCard
+            label="Bear Case"
+            title={d.bearCase.title}
+            points={d.bearCase.points}
+            target={d.bearCase.targetPrice}
+            probability={d.bearCase.probability}
+            color="#ef4444"
+            bg="rgba(239,68,68,0.05)"
+            border="rgba(239,68,68,0.18)"
+            icon="↓"
+          />
+        )}
+        {/* Base Case */}
+        {d.baseCase && (
+          <CaseCard
+            label="Base Case"
+            title={d.baseCase.title}
+            points={[]}
+            target={d.baseCase.targetPrice}
+            probability={d.baseCase.probability}
+            color="#f59e0b"
+            bg="rgba(245,158,11,0.05)"
+            border="rgba(245,158,11,0.18)"
+            icon="→"
+          />
+        )}
+      </div>
+
+      {/* Key Drivers */}
+      {d.keyDrivers?.length > 0 && (
+        <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
+          <SectionTitle>Key Investment Drivers</SectionTitle>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+            {d.keyDrivers.map((driver, i) => (
+              <div key={i} className="metric-row">
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.85rem', color: 'var(--txt-primary)', fontWeight: 500 }}>{driver.driver}</span>
+                  <span style={{ marginLeft: '0.75rem', fontSize: '0.8rem', color: 'var(--txt-secondary)' }}>{driver.detail}</span>
+                </div>
+                <ImpactBadge impact={driver.impact} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom row: Moat + Catalysts + Risks */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.875rem' }}>
+        {/* Economic Moat */}
+        <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
+          <SectionTitle>Economic Moat</SectionTitle>
+          <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.5rem' }}>
+            {[1,2,3,4,5].map(s => (
+              <div key={s} style={{ width: '28px', height: '6px', borderRadius: '3px', background: s <= moatStars ? 'var(--teal)' : 'rgba(0,212,170,0.12)' }} />
+            ))}
+          </div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--teal)', fontFamily: 'var(--font-dm-mono)', marginBottom: '0.4rem' }}>{d.moatType}</div>
+          {d.growthQuality && <p style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)', lineHeight: 1.6, fontFamily: 'var(--font-dm-mono)' }}>{d.growthQuality}</p>}
+        </div>
+
+        {/* Catalysts */}
+        {d.catalysts?.length > 0 && (
+          <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
+            <SectionTitle>Near-Term Catalysts</SectionTitle>
+            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {d.catalysts.map((c, i) => (
+                <li key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                  <span style={{ color: 'var(--gain)', marginTop: '0.1rem', flexShrink: 0 }}>◆</span>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', lineHeight: 1.5 }}>{c}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Risks */}
+        {d.risks?.length > 0 && (
+          <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
+            <SectionTitle>Key Risks</SectionTitle>
+            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {d.risks.map((r, i) => (
+                <li key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                  <span style={{ color: 'var(--loss)', marginTop: '0.1rem', flexShrink: 0 }}>◆</span>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', lineHeight: 1.5 }}>{r}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/* Position sizing */}
+      {(d.positionSizing || d.comparisonPeers?.length) && (
+        <div className="card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-start' }}>
+          {d.positionSizing && (
+            <div>
+              <SectionTitle>Recommended Positioning</SectionTitle>
+              <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1rem', color: 'var(--teal)', fontWeight: 500 }}>{d.positionSizing}</span>
+            </div>
+          )}
+          {d.comparisonPeers?.length > 0 && (
+            <div>
+              <SectionTitle>Peer Group</SectionTitle>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {d.comparisonPeers.map((p, i) => (
+                  <span key={i} style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.8rem', color: 'var(--txt-secondary)', background: 'rgba(0,212,170,0.05)', border: '1px solid rgba(0,212,170,0.12)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CaseCard({ label, title, points, target, probability, color, bg, border, icon }) {
+  return (
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: '8px', padding: '1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
+        <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1rem', color, fontWeight: 700 }}>{icon}</span>
+        <span style={{ fontSize: '0.68rem', fontFamily: 'var(--font-dm-mono)', color, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{label}</span>
+        {probability && (
+          <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color, fontFamily: 'var(--font-dm-mono)' }}>{probability}% prob.</span>
+        )}
+      </div>
+      {title && (
+        <div style={{ fontFamily: 'var(--font-playfair)', fontSize: '0.95rem', color: 'var(--txt-primary)', marginBottom: '0.75rem', lineHeight: 1.3 }}>{title}</div>
+      )}
+      {target && (
+        <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.1rem', color, fontWeight: 600, marginBottom: '0.625rem' }}>
+          Target: {formatPrice(target)}
+        </div>
+      )}
+      {points?.length > 0 && (
+        <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          {points.map((p, i) => (
+            <li key={i} style={{ fontSize: '0.8rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', lineHeight: 1.5, paddingLeft: '0.75rem', borderLeft: `2px solid ${color}40` }}>
+              {p}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function SectionTitle({ children }) {
+  return (
+    <div style={{ fontSize: '0.68rem', color: 'var(--txt-muted)', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'var(--font-dm-mono)', marginBottom: '0.75rem' }}>
+      {children}
+    </div>
+  )
+}
+
+function ImpactBadge({ impact }) {
+  const map = {
+    POSITIVE: { color: '#22c55e', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.25)' },
+    NEGATIVE: { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.25)' },
+    NEUTRAL: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)' },
+  }
+  const s = map[impact?.toUpperCase()] || map.NEUTRAL
+  return (
+    <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-dm-mono)', color: s.color, background: s.bg, border: `1px solid ${s.border}`, padding: '0.15rem 0.5rem', borderRadius: '3px', letterSpacing: '0.08em', flexShrink: 0 }}>
+      {impact}
+    </span>
+  )
+}
