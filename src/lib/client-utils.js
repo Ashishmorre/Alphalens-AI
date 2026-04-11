@@ -9,13 +9,14 @@
  * @param {number} decimals
  * @returns {string}
  */
-export function formatNumber(n, decimals = 2) {
+export function formatNumber(n, decimals = 2, currency = null) {
   if (n == null || isNaN(n)) return '—'
-  if (Math.abs(n) >= 1e12) return '$' + (n / 1e12).toFixed(decimals) + 'T'
-  if (Math.abs(n) >= 1e9) return '$' + (n / 1e9).toFixed(decimals) + 'B'
-  if (Math.abs(n) >= 1e6) return '$' + (n / 1e6).toFixed(decimals) + 'M'
-  if (Math.abs(n) >= 1e3) return '$' + (n / 1e3).toFixed(decimals) + 'K'
-  return '$' + n.toFixed(decimals)
+  const symbol = currency ? getCurrencySymbol(currency) : '$'
+  if (Math.abs(n) >= 1e12) return symbol + (n / 1e12).toFixed(decimals) + 'T'
+  if (Math.abs(n) >= 1e9) return symbol + (n / 1e9).toFixed(decimals) + 'B'
+  if (Math.abs(n) >= 1e6) return symbol + (n / 1e6).toFixed(decimals) + 'M'
+  if (Math.abs(n) >= 1e3) return symbol + (n / 1e3).toFixed(decimals) + 'K'
+  return symbol + n.toFixed(decimals)
 }
 
 /**
@@ -217,18 +218,18 @@ export function truncate(str, len = 120) {
 }
 
 /**
- * Get exchange flag emoji
+ * Get exchange region code
  * @param {string} exchange
  * @returns {string}
  */
 export function getExchangeFlag(exchange) {
   if (!exchange) return ''
   const e = exchange.toUpperCase()
-  if (e.includes('NSE') || e.includes('BSE')) return '🇮🇳'
-  if (e.includes('LSE') || e.includes('LONDON')) return '🇬🇧'
-  if (e.includes('TSX')) return '🇨🇦'
-  if (e.includes('ASX')) return '🇦🇺'
-  if (e.includes('HKEX') || e.includes('HONG')) return '🇭🇰'
-  if (e.includes('TSE') || e.includes('TOKYO')) return '🇯🇵'
-  return '🇺🇸'
+  if (e.includes('NSE') || e.includes('BSE')) return 'IN'
+  if (e.includes('LSE') || e.includes('LONDON')) return 'UK'
+  if (e.includes('TSX')) return 'CA'
+  if (e.includes('ASX')) return 'AU'
+  if (e.includes('HKEX') || e.includes('HONG')) return 'HK'
+  if (e.includes('TSE') || e.includes('TOKYO')) return 'JP'
+  return 'US'
 }

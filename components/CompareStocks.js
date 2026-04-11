@@ -126,7 +126,7 @@ function CompareResults({ stock1, stock2, comparison }) {
           Overall Winner
         </div>
         <div style={{ fontFamily: 'var(--font-playfair)', fontSize: '2rem', color: isTie ? '#f59e0b' : 'var(--teal)', marginBottom: '0.5rem' }}>
-          {isTie ? '🤝 It\'s a Tie' : `🏆 ${c.winner}`}
+          {isTie ? "It's a Tie" : `● ${c.winner}`}
         </div>
         <p style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.85rem', color: 'var(--txt-secondary)', maxWidth: '520px', margin: '0 auto', lineHeight: 1.6 }}>
           {c.winnerRationale}
@@ -194,9 +194,9 @@ function CompareResults({ stock1, stock2, comparison }) {
           <SectionTitle>Who Should Buy Which?</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.875rem' }}>
             {[
-              { label: '📈 Growth Investors', ticker: c.recommendation.forGrowthInvestors, rationale: c.recommendation.growthRationale },
-              { label: '💰 Value Investors', ticker: c.recommendation.forValueInvestors, rationale: c.recommendation.valueRationale },
-              { label: '🏦 Income Investors', ticker: c.recommendation.forIncomeInvestors, rationale: c.recommendation.incomeRationale },
+              { label: 'Growth Investors', ticker: c.recommendation.forGrowthInvestors, rationale: c.recommendation.growthRationale },
+              { label: 'Value Investors', ticker: c.recommendation.forValueInvestors, rationale: c.recommendation.valueRationale },
+              { label: 'Income Investors', ticker: c.recommendation.forIncomeInvestors, rationale: c.recommendation.incomeRationale },
             ].map(({ label, ticker, rationale }) => (
               <div key={label} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.875rem', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', marginBottom: '0.35rem' }}>{label}</div>
