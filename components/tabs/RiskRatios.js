@@ -193,7 +193,7 @@ function ScoreGauge({ score, label, inverted }) {
           />
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.15rem', color, fontWeight: 500, lineHeight: 1 }}>{isNaN(parseFloat(score)) ? "N/A" : parseFloat(score).toFixed(1)}</span>
+          <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.15rem', color, fontWeight: 500, lineHeight: 1 }}>{isNaN(parseFloat(score)) ? "—" : parseFloat(score).toFixed(1)}</span>
           <span style={{ fontSize: '0.6rem', color: 'var(--txt-muted)', lineHeight: 1 }}>/10</span>
         </div>
       </div>

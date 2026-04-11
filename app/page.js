@@ -15,10 +15,10 @@ import { apiFetch, apiPost, getErrorMessage } from '@/lib/api-client'
 import { normalizeAIResponse } from '@/lib/ai-normalizer'
 
 const ANALYSIS_TABS = [
-  { id: 'thesis', label: 'Investment Thesis', icon: '🎯' },
-  { id: 'dcf', label: 'DCF Valuation', icon: '📊' },
-  { id: 'risk', label: 'Risk & Ratios', icon: '🛡️' },
-  { id: 'news', label: 'News Sentiment', icon: '📰' },
+  { id: 'thesis', label: 'Investment Thesis' },
+  { id: 'dcf', label: 'DCF Valuation' },
+  { id: 'risk', label: 'Risk & Ratios' },
+  { id: 'news', label: 'News Sentiment' },
 ]
 
 const NAV_TABS = ['Research', 'Compare']
@@ -132,7 +132,7 @@ export default function Home() {
                   onClick={() => setNavTab(tab)}
                   style={{ fontSize: '0.8rem' }}
                 >
-                  {tab === 'Research' ? '📈 ' : '⚖️ '}{tab}
+                  {tab}
                 </button>
               ))}
             </div>
@@ -150,7 +150,6 @@ export default function Home() {
                         onClick={() => handleTabChange(tab.id)}
                         style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                       >
-                        <span>{tab.icon}</span>
                         <span className="tab-label">{tab.label}</span>
                         {analysisCache[`${stockData.ticker}_${tab.id}`] && (
                           <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--teal)', display: 'inline-block', marginLeft: '2px' }} />
@@ -249,32 +248,32 @@ export default function Home() {
 function FeatureCards() {
   const features = [
     {
-      icon: '🎯',
+      icon: '◆',
       title: 'Investment Thesis',
       desc: 'AI-generated bull, bear & base cases with price targets, moat analysis, and position sizing guidance.',
     },
     {
-      icon: '📊',
+      icon: '◆',
       title: 'DCF Valuation',
       desc: '5-year free cash flow model with WACC, terminal value, intrinsic value per share & sensitivity tables.',
     },
     {
-      icon: '🛡️',
+      icon: '◆',
       title: 'Risk & Ratios',
       desc: 'Complete ratio suite with sector benchmarks, risk matrix, leverage health & technical signals.',
     },
     {
-      icon: '📰',
+      icon: '◆',
       title: 'News Sentiment',
       desc: 'Sentiment scoring, analyst consensus, macro exposure, catalysts & 30-60 day tactical notes.',
     },
     {
-      icon: '⚖️',
+      icon: '◆',
       title: 'Compare Stocks',
       desc: 'Head-to-head comparison of any two tickers with dimension scores and investor-type recommendations.',
     },
     {
-      icon: '📄',
+      icon: '◆',
       title: 'PDF Export',
       desc: 'Download a styled research report PDF of any analysis tab to share or store for your portfolio.',
     },
