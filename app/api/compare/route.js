@@ -3,9 +3,9 @@ import {
   checkRateLimit,
   RATE_LIMIT_PRESETS,
   createRateLimitHeaders,
-} from '../../../../lib/server/rate-limit.js'
-import { validateCompareRequest } from '../../../../lib/server/validation.js'
-import { safeParseJSON } from '../../../../lib/server/json-parser.js'
+} from '../../../../lib/server/rate-limit'
+import { validateCompareRequest } from '../../../../lib/server/validation'
+import { safeParseJSON } from '../../../../lib/server/json-parser'
 import {
   checkBodySize,
   parseJSONBody,
@@ -13,8 +13,8 @@ import {
   createErrorResponse,
   callAIWithRetry,
   logError,
-} from '../../../../lib/server/api-utils.js'
-import { fmtNumber, fmtPercent } from '../../../../lib/server/yahoo-finance.js'
+} from '../../../../lib/server/api-utils'
+import { fmtNumber, fmtPercent } from '../../../../lib/server/yahoo-finance'
 
 const RATE_LIMIT = RATE_LIMIT_PRESETS.compare
 

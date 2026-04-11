@@ -4,13 +4,13 @@ import {
   checkRateLimit,
   RATE_LIMIT_PRESETS,
   createRateLimitHeaders,
-} from '../../../../lib/server/rate-limit.js'
-import { validateTicker } from '../../../../lib/server/validation.js'
+} from '../../../../lib/server/rate-limit'
+import { validateTicker } from '../../../../lib/server/validation'
 import {
   fetchStockData,
   transformYahooData,
-} from '../../../../lib/server/yahoo-finance.js'
-import { createSuccessResponse, createErrorResponse, logError } from '../../../../lib/server/api-utils.js'
+} from '../../../../lib/server/yahoo-finance'
+import { createSuccessResponse, createErrorResponse, logError } from '../../../../lib/server/api-utils'
 
 const RATE_LIMIT = RATE_LIMIT_PRESETS.stockData
 

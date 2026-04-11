@@ -7,7 +7,8 @@
       "Bash(curl -s http://localhost:3000)",
       "Bash(npm run:*)",
       "Bash(NO_TURBOPACK=1 npm run build)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(ls -la lib/server/*.js src/lib/server/*.js)"
     ]
   },
   "enableAllProjectMcpServers": true,
