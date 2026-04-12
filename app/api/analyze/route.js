@@ -59,14 +59,59 @@ Return ONLY JSON with:
 function buildDCFPrompt(ticker, d) {
   const price = d.price?.toFixed?.(2) || 100
   return {
-    system: 'You are a CFA charterholder. Return ONLY valid JSON with no markdown.',
+    system: 'You are a CFA charterholder. You MUST return ONLY a valid JSON object, no markdown, no code blocks, no explanatory text.',
     user: `Build a 5-year DCF model for ${ticker}.
 
-Current: ${d.currency || 'USD'} ${price}, Revenue ${fmtNumber(d.revenue)}, EBITDA ${fmtNumber(d.ebitda)}
-Margins: Gross ${fmtPercent(d.grossMargin)}, Operating ${fmtPercent(d.operatingMargin)}
-Balance: Debt ${fmtNumber(d.totalDebt)}, Cash ${fmtNumber(d.totalCash)}
+CURRENT DATA:
+- Price: ${price} ${d.currency || 'USD'}
+- Revenue: ${fmtNumber(d.revenue)}
+- EBITDA: ${fmtNumber(d.ebitda)}
+- Gross Margin: ${fmtPercent(d.grossMargin)}
+- Operating Margin: ${fmtPercent(d.operatingMargin)}
+- Total Debt: ${fmtNumber(d.totalDebt)}
+- Cash: ${fmtNumber(d.totalCash)}
 
-Return ONLY JSON with: assumptions (wacc, terminalGrowthRate, taxRate, revenueGrowthRates[], ebitdaMargins[]), projections[5 years], pvFCFs, terminalValue, pvTerminalValue, enterpriseValue, equityValue, intrinsicValuePerShare, marginOfSafety, upside, dcfRating, sensitivityTable, keyRisksToModel, analystNote.`,
+Return a SINGLE VALID JSON OBJECT with this exact structure (numbers only, no currency symbols in values):
+{
+  "assumptions": {
+    "wacc": 10.0,
+    "terminalGrowthRate": 2.5,
+    "taxRate": 21.0,
+    "revenueGrowthRates": [10.0, 9.5, 9.0, 8.5, 8.0],
+    "ebitdaMargins": [20.0, 21.0, 22.0, 23.0, 24.0]
+  },
+  "projections": [
+    {"year": 1, "revenue": 1000000, "ebitda": 200000, "ebit": 150000, "nopat": 118500, "capex": -50000, "nwcChange": -10000, "fcf": 58500},
+    {"year": 2, ...},
+    {"year": 3, ...},
+    {"year": 4, ...},
+    {"year": 5, ...}
+  ],
+  "pvFCFs": 280000,
+  "terminalValue": 1500000,
+  "pvTerminalValue": 950000,
+  "enterpriseValue": 1230000,
+  "equityValue": 1000000,
+  "intrinsicValuePerShare": 125.5,
+  "marginOfSafety": 15.0,
+  "upside": 22.5,
+  "dcfRating": "UNDERVALUED",
+  "sensitivityTable": {
+    "waccRange": [8.0, 9.0, 10.0, 11.0, 12.0],
+    "tgrRange": [1.5, 2.0, 2.5, 3.0, 3.5],
+    "values": [[150, 140, 130], [145, 135, 125], ...]
+  },
+  "keyRisksToModel": ["Risk 1", "Risk 2"],
+  "analystNote": "Brief DCF methodology note"
+}
+
+REQUIREMENTS:
+1. Return ONLY the JSON object, no markdown backticks
+2. Use realistic numbers based on ${ticker}'s financials
+3. All numeric values must be plain numbers (not strings)
+4. WACC in percentage points (e.g., 10.0 for 10%)
+5. 5 projection years exactly
+6. Ensure calculations are mathematically consistent`,
   }
 }
 
