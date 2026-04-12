@@ -47,7 +47,13 @@ Margins: Net ${fmtPercent(d.profitMargin)}, Gross ${fmtPercent(d.grossMargin)}, 
 Growth: Revenue ${fmtPercent(d.revenueGrowth)}, Beta ${d.beta?.toFixed?.(2) || 'N/A'}
 Sector: ${d.sector || 'N/A'}, Industry: ${d.industry || 'N/A'}
 
-Return ONLY JSON with: verdict, confidence, targetPrice, upsideDownside, timeHorizon, thesisSummary, bullCase, bearCase, baseCase, keyDrivers, moatRating, moatType, growthQuality, catalysts, risks, positionSizing, comparisonPeers.`,
+Return ONLY JSON with:
+- verdict, confidence, targetPrice, upsideDownside, timeHorizon, thesisSummary
+- bullCase: { title, targetPrice, probability, points[] }
+- bearCase: { title, targetPrice, probability, points[] }
+- baseCase: { title, targetPrice, probability }
+- keyDrivers[], moatRating, moatType, growthQuality, catalysts[], risks[], positionSizing, comparisonPeers[],`,
+}
   }
 }
 
