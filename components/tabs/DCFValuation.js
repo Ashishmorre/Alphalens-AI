@@ -1,12 +1,29 @@
 'use client'
 import { formatNumber, formatPrice } from '@/lib/client-utils'
+import { calculateUpside, calculateDCFRating } from '@/lib/financial-utils'
+import ErrorBoundary from '@/components/ErrorBoundary'
+import SensitivityTable from './SensitivityTable'
 
 export default function DCFValuation({ data, currency }) {
   if (!data) return null
   const d = data
 
-  const isUndervalued = d.upside > 10
-  const isOvervalued = d.upside < -10
+  // Ensure upside is calculated correctly: ((IV - CP) / CP) * 100
+  const currentPrice = d.currentPrice
+  const intrinsicValue = d.intrinsicValuePerShare
+
+  // Always recalculate upside from raw prices - never trust API-derived values
+  let upside = 0
+  if (intrinsicValue && currentPrice && currentPrice > 0) {
+    upside = calculateUpside(intrinsicValue, currentPrice)
+  }
+
+  // Derive rating from calculated upside - never use API rating directly
+  const dcfRating = calculateDCFRating(upside)
+
+  // Determine rating based on calculated upside
+  const isUndervalued = intrinsicValue > currentPrice
+  const isOvervalued = intrinsicValue < currentPrice
   const ratingColor = isUndervalued ? '#22c55e' : isOvervalued ? '#ef4444' : '#f59e0b'
 
   return (
@@ -26,7 +43,7 @@ export default function DCFValuation({ data, currency }) {
                 Current: {formatPrice(d.currentPrice, currency)}
               </span>
               <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1rem', fontWeight: 600, color: ratingColor }}>
-                {d.upside >= 0 ? '+' : ''}{d.upside?.toFixed(1)}% {d.upside >= 0 ? 'upside' : 'downside'}
+                {upside >= 0 ? '+' : ''}{upside.toFixed(1)}% {upside >= 0 ? 'upside' : 'downside'}
               </span>
             </div>
           </div>
@@ -35,7 +52,7 @@ export default function DCFValuation({ data, currency }) {
             <SummaryMetric label="WACC" value={`${d.assumptions?.wacc?.toFixed(1)}%`} />
             <SummaryMetric label="Terminal Growth" value={`${d.assumptions?.terminalGrowthRate?.toFixed(1)}%`} />
             <SummaryMetric label="Tax Rate" value={`${d.assumptions?.taxRate?.toFixed(1)}%`} />
-            <SummaryMetric label="Rating" value={d.dcfRating} color={ratingColor} />
+            <SummaryMetric label="Rating" value={dcfRating} color={ratingColor} />
           </div>
         </div>
 
@@ -47,7 +64,7 @@ export default function DCFValuation({ data, currency }) {
             { label: 'PV of TV', value: formatNumber(d.pvTerminalValue, 2, currency) },
             { label: 'Enterprise Value', value: formatNumber(d.enterpriseValue, 2, currency) },
             { label: 'Equity Value', value: formatNumber(d.equityValue, 2, currency) },
-            { label: 'Margin of Safety', value: `${d.marginOfSafety?.toFixed(1)}%`, color: d.marginOfSafety > 0 ? 'var(--gain)' : 'var(--loss)' },
+            { label: 'Margin of Safety', value: `${d.marginOfSafety?.toFixed(1)}%`, color: upside > 0 ? 'var(--gain)' : 'var(--loss)' },
           ].map(({ label, value, color }) => (
             <div key={label} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ fontSize: '0.65rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.3rem' }}>{label}</div>
@@ -110,49 +127,10 @@ export default function DCFValuation({ data, currency }) {
         </div>
       )}
 
-      {/* Sensitivity Table */}
-      {d.sensitivityTable && (
-        <div className="card" style={{ padding: '1.25rem 1.5rem', overflowX: 'auto' }}>
-          <SectionTitle>Sensitivity Analysis — Intrinsic Value per Share</SectionTitle>
-          <div style={{ fontSize: '0.75rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', marginBottom: '1rem' }}>
-            WACC (columns) × Terminal Growth Rate (rows)
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table" style={{ minWidth: '380px' }}>
-              <thead>
-                <tr>
-                  <th>TGR \ WACC</th>
-                  {d.sensitivityTable.waccRange?.map((w, i) => (
-                    <th key={i} style={{ textAlign: 'right' }}>{w?.toFixed(1)}%</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {d.sensitivityTable.tgrRange?.map((tgr, ri) => (
-                  <tr key={ri}>
-                    <td style={{ color: 'var(--txt-secondary)' }}>{tgr?.toFixed(1)}%</td>
-                    {d.sensitivityTable.values?.[ri]?.map((val, ci) => {
-                      const cellClass = getSensitivityClass(val, d.currentPrice)
-                      return (
-                        <td key={ci} className={cellClass} style={{ textAlign: 'right', fontWeight: 500 }}>
-                          {formatPrice(val, currency)}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ marginTop: '0.75rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <LegendItem color="rgba(34,197,94,0.18)" text="Significantly undervalued" textColor="#4ade80" />
-            <LegendItem color="rgba(34,197,94,0.09)" text="Undervalued" textColor="#86efac" />
-            <LegendItem color="rgba(0,212,170,0.06)" text="Near fair value" textColor="var(--teal)" />
-            <LegendItem color="rgba(239,68,68,0.09)" text="Overvalued" textColor="#fca5a5" />
-            <LegendItem color="rgba(239,68,68,0.18)" text="Significantly overvalued" textColor="#f87171" />
-          </div>
-        </div>
-      )}
+      {/* Sensitivity Table with Error Boundary */}
+      <ErrorBoundary>
+        <SensitivityTable data={d.sensitivityTable} currentPrice={d.currentPrice} currency={currency} />
+      </ErrorBoundary>
 
       {/* Analyst note */}
       {d.analystNote && (
@@ -178,16 +156,6 @@ export default function DCFValuation({ data, currency }) {
       )}
     </div>
   )
-}
-
-function getSensitivityClass(val, currentPrice) {
-  if (!val || !currentPrice) return ''
-  const diff = (val - currentPrice) / currentPrice
-  if (diff > 0.2) return 'cell-high'
-  if (diff > 0.05) return 'cell-med-high'
-  if (diff > -0.05) return 'cell-neutral'
-  if (diff > -0.2) return 'cell-med-low'
-  return 'cell-low'
 }
 
 function SummaryMetric({ label, value, color }) {
