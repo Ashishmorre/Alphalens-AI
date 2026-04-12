@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useMemo, useCallback } from 'react'
 import {
+  calculateValuationSpread,
+  getValuationVerdict,
   calculateUpside,
   calculateDCFRating,
   calculateFCF,
@@ -18,28 +20,52 @@ import {
 
 const DCFContext = createContext(undefined)
 
-export function DCFProvider({ children, initialData }) {
-  // Derive all computed values from raw data
-  const dcfData = useMemo(() => {
-    if (!initialData) return null
+/**
+ * DCF Provider
+ * Solves State Desync by deriving all values from raw API data once.
+ * Both Summary Cards and Projections Table read from the same derived state.
+ */
+export function DCFProvider({ children, rawApiData }) {
+  // 1. Sanitize incoming API data (The Single Source of Truth)
+  const safeData = useMemo(() => {
+    if (!rawApiData) return null
 
-    const d = initialData
+    const d = rawApiData
+
+    return {
+      currentPrice: d?.currentPrice || 0,
+      wacc: d?.assumptions?.wacc || 10,
+      terminalGrowthRate: d?.assumptions?.terminalGrowthRate || 2.5,
+      sharesOutstanding: d?.sharesOutstanding || d?.assumptions?.sharesOutstanding || 1,
+      currency: d?.ticker?.endsWith('.NS') || d?.ticker?.endsWith('.BO') ? 'INR' : 'USD',
+      // Ensure cashflows are an array to prevent .map() crashes
+      projectedCashFlows: Array.isArray(d?.projections) ? d.projections : [],
+      // Original data for pass-through
+      originalData: d,
+    }
+  }, [rawApiData])
+
+  // 2. Derive the complex math exactly once here, NOT in individual components
+  const dcfData = useMemo(() => {
+    if (!safeData) return null
+
+    const { projectedCashFlows, wacc, terminalGrowthRate, currentPrice, sharesOutstanding } = safeData
 
     // Validate required data
-    if (!d.projections || !Array.isArray(d.projections)) {
-      return d
+    if (!projectedCashFlows.length) {
+      return safeData.originalData
     }
 
     // Ensure all projections have correctly calculated FCF based on the formula:
     // FCF = NOPAT + D&A - CapEx - Change in NWC
-    const projections = d.projections.map((p) => {
+    const projections = projectedCashFlows.map((p) => {
       const depreciation = (p.ebitda || 0) - (p.ebit || 0)
       const calculatedFCF = calculateFCF(p.nopat || 0, depreciation, p.capex || 0, p.nwcChange || 0)
 
       return {
         ...p,
         fcf: calculatedFCF, // Override any API-provided FCF with calculated value
-        pvFCF: calculatePV(calculatedFCF, d.assumptions?.wacc || 10, p.year || 1),
+        pvFCF: calculatePV(calculatedFCF, wacc, p.year || 1),
       }
     })
 
@@ -50,8 +76,6 @@ export function DCFProvider({ children, initialData }) {
     const finalProjection = projections[projections.length - 1]
     const finalFCF = finalProjection?.fcf || 0
 
-    const wacc = d.assumptions?.wacc || 10
-    const terminalGrowthRate = d.assumptions?.terminalGrowthRate || 2.5
     const years = projections.length || 5
 
     const terminalValue = calculateTerminalValue(finalFCF, wacc, terminalGrowthRate)
@@ -59,18 +83,18 @@ export function DCFProvider({ children, initialData }) {
     const enterpriseValue = calculateEnterpriseValue(pvFCFs, pvTerminalValue)
 
     // Use actual cash/debt from stock data if available
-    const totalCash = d.totalCash || d.assumptions?.cash || 0
-    const totalDebt = d.totalDebt || d.assumptions?.debt || 0
+    const totalCash = safeData.originalData?.totalCash || safeData.originalData?.assumptions?.cash || 0
+    const totalDebt = safeData.originalData?.totalDebt || safeData.originalData?.assumptions?.debt || 0
 
     const equityValue = calculateEquityValue(enterpriseValue, totalCash, totalDebt)
 
-    const sharesOutstanding = d.sharesOutstanding || d.assumptions?.sharesOutstanding || 1
     const intrinsicValuePerShare = calculateIntrinsicValuePerShare(equityValue, sharesOutstanding)
 
-    const currentPrice = d.currentPrice || 0
+    // Always recalculate upside from raw prices using the fixed formula
+    const upside = calculateValuationSpread(currentPrice, intrinsicValuePerShare)
 
-    // Always recalculate upside from raw prices
-    const upside = calculateUpside(intrinsicValuePerShare, currentPrice)
+    // Grab the corrected verdict and spread from our utility file
+    const verdict = getValuationVerdict(currentPrice, intrinsicValuePerShare)
 
     // Derive rating from calculated upside
     const dcfRating = calculateDCFRating(upside)
@@ -78,7 +102,7 @@ export function DCFProvider({ children, initialData }) {
     const marginOfSafety = calculateMarginOfSafety(intrinsicValuePerShare, currentPrice)
 
     return {
-      ...d,
+      ...safeData.originalData,
       projections,
       pvFCFs,
       terminalValue,
@@ -87,10 +111,12 @@ export function DCFProvider({ children, initialData }) {
       equityValue,
       intrinsicValuePerShare,
       upside,
+      spreadPercentage: upside,
+      verdict,
       dcfRating,
       marginOfSafety,
     }
-  }, [initialData])
+  }, [safeData])
 
   // Helper to recalculate sensitivity table
   const calculateSensitivity = useCallback((baseIntrinsicValue, currentPrice, waccRange, tgrRange) => {
@@ -121,6 +147,8 @@ export function DCFProvider({ children, initialData }) {
 
   const value = {
     data: dcfData,
+    baseData: safeData,
+    derivedData: dcfData,
     calculateSensitivity,
     isValid: !!dcfData?.projections?.length,
   }

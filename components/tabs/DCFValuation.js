@@ -1,6 +1,6 @@
 'use client'
 import { formatNumber, formatPrice } from '@/lib/client-utils'
-import { calculateUpside, calculateDCFRating } from '@/lib/financial-utils'
+import { calculateUpside, getValuationVerdict, calculateDCFRating } from '@/lib/financial-utils'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import SensitivityTable from './SensitivityTable'
 
@@ -8,12 +8,13 @@ export default function DCFValuation({ data, currency }) {
   if (!data) return null
   const d = data
 
-  // Ensure upside is calculated correctly: ((IV - CP) / CP) * 100
-  const currentPrice = d.currentPrice
-  const intrinsicValue = d.intrinsicValuePerShare
+  // Use the strictly derived verdict from our corrected math engine
+  const verdict = getValuationVerdict(d.currentPrice, d.intrinsicValuePerShare)
 
   // Always recalculate upside from raw prices - never trust API-derived values
   let upside = 0
+  const currentPrice = d.currentPrice
+  const intrinsicValue = d.intrinsicValuePerShare
   if (intrinsicValue && currentPrice && currentPrice > 0) {
     upside = calculateUpside(intrinsicValue, currentPrice)
   }
@@ -21,10 +22,10 @@ export default function DCFValuation({ data, currency }) {
   // Derive rating from calculated upside - never use API rating directly
   const dcfRating = calculateDCFRating(upside)
 
-  // Determine rating based on calculated upside
-  const isUndervalued = intrinsicValue > currentPrice
-  const isOvervalued = intrinsicValue < currentPrice
-  const ratingColor = isUndervalued ? '#22c55e' : isOvervalued ? '#ef4444' : '#f59e0b'
+  // Determine rating based on calculated verdict (strict math)
+  const isUndervalued = verdict.label === 'UNDERVALUED'
+  const isOvervalued = verdict.label === 'OVERVALUED'
+  const ratingColor = verdict.color === 'text-green-500' ? '#22c55e' : verdict.color === 'text-red-500' ? '#ef4444' : '#f59e0b'
 
   return (
     <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
