@@ -97,7 +97,7 @@ export default function StockOverview({ data, onCompare }) {
       {/* Secondary stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.625rem' }}>
         {[
-          { label: 'Revenue', value: formatNumber(data.revenue) },
+          { label: 'Revenue', value: formatNumber(data.revenue, 2, data.currency) },
           { label: 'EBITDA', value: formatNumber(data.ebitda, 2, data.currency) },
           { label: 'Free Cash Flow', value: formatNumber(data.freeCashFlow, 2, data.currency) },
           { label: 'Gross Margin', value: formatPct(data.grossMargin) },
