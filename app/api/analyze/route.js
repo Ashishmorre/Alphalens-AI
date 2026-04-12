@@ -181,37 +181,37 @@ CURRENT DATA:
 - Beta: ${d.beta?.toFixed?.(2) || '—'}
 
 CRITICAL RULES:
-1. For valuationRatios, qualityRatios, and leverageRatios, you MUST use the exact values provided in the CURRENT DATA above. Do not invent them.
-2. For benchmarks, provide a realistic sector average.
-3. overallRiskScore MUST be an integer between 1 and 10 (1 = Safest, 10 = Most Risky).
-4. overallQualityScore MUST be an integer between 1 and 10 (1 = Lowest Quality, 10 = Highest Quality).
+1. For valuationRatios, qualityRatios, and leverageRatios, you MUST use the exact 'CURRENT DATA' values provided above. Do not invent them.
+2. REPLACE all '0' and empty string '""' values in the JSON template below with your own highly accurate analysis. DO NOT output 0 unless it is the actual calculated value.
+3. overallRiskScore & overallQualityScore MUST be between 1 and 10.
+4. Provide realistic sector averages for the benchmarks.
 
-Return ONLY JSON matching this exact structure (replace <placeholders> with your analysis):
+Return ONLY JSON matching this exact structure:
 {
   "valuationRatios": [
-    {"name": "P/E Ratio", "value": "${pe}", "benchmark": "<sector_avg_pe>"}
+    {"name": "P/E Ratio", "value": "${pe}", "benchmark": "0.0x"}
   ],
   "qualityRatios": [
-    {"name": "ROE", "value": "${roe}", "benchmark": "<sector_avg_roe>"}
+    {"name": "ROE", "value": "${roe}", "benchmark": "0.0%"}
   ],
   "leverageRatios": [
-    {"name": "Debt/Equity", "value": "${debtEq}", "benchmark": "<sector_avg_debt_eq>"}
+    {"name": "Debt/Equity", "value": "${debtEq}", "benchmark": "0.0x"}
   ],
   "technicals": {
-    "trend": "<BULLISH|BEARISH|NEUTRAL>",
-    "rsi": <integer_between_0_and_100>,
-    "support": <realistic_price_number>,
-    "resistance": <realistic_price_number>,
-    "volumeSignal": "<string_description>"
+    "trend": "NEUTRAL",
+    "rsi": 0,
+    "support": 0,
+    "resistance": 0,
+    "volumeSignal": ""
   },
   "riskFactors": [
-    {"factor": "<specific_risk_name>", "severity": "<High|Medium|Low>", "description": "<brief_detail>"}
+    {"factor": "", "severity": "Medium", "description": ""}
   ],
-  "overallRiskScore": <integer_1_to_10>,
-  "overallQualityScore": <integer_1_to_10>,
-  "riskSummary": "<2_sentence_summary>",
+  "overallRiskScore": 0,
+  "overallQualityScore": 0,
+  "riskSummary": "",
   "peerBenchmarks": [
-    {"ticker": "<REAL_PEER_TICKER>", "metric": "P/E", "value": "<estimated_peer_pe>"}
+    {"ticker": "PEER.NS", "metric": "P/E", "value": "0.0x"}
   ]
 }`
   };
@@ -241,46 +241,46 @@ COMPANY CONTEXT:
 - Recommendation: ${rec}
 
 CRITICAL RULES:
-1. sentimentScore MUST be an integer between 0 and 100 (0=Bearish, 50=Neutral, 100=Bullish).
-2. sentimentLabel MUST logically match the score.
-3. The analystConsensus object MUST use the dynamically injected target and upside values provided in the schema below. DO NOT change them.
-4. Provide realistic values for analyst buy/hold/sell counts based on typical coverage for a company of this size.
+1. REPLACE all '0' and empty string '""' values in the template below with your own realistic analysis. DO NOT output 0 unless it is the actual calculated value.
+2. sentimentScore MUST be an integer between 0 and 100.
+3. The analystConsensus object MUST strictly use the target and upside values already injected into the template. Do not change them.
+4. Generate highly realistic, sector-specific themes, catalysts, and events.
 
-Return ONLY JSON matching this exact structure (replace <placeholders> with your analysis):
+Return ONLY JSON matching this exact structure:
 {
-  "sentimentScore": <integer_0_to_100>,
-  "sentimentLabel": "<Positive|Neutral|Negative>",
-  "sentimentRationale": "<2_sentence_explanation>",
+  "sentimentScore": 0,
+  "sentimentLabel": "Neutral",
+  "sentimentRationale": "",
   "analystConsensus": {
     "rating": "${rec.includes('BUY') ? 'BUY' : rec.includes('SELL') ? 'SELL' : 'HOLD'}",
     "meanTarget": ${target !== 'N/A' ? target : 'null'},
     "upside": ${upsideStr},
-    "buyCount": <realistic_integer>,
-    "holdCount": <realistic_integer>,
-    "sellCount": <realistic_integer>,
-    "noteOnConsensus": "<brief_note>"
+    "buyCount": 0,
+    "holdCount": 0,
+    "sellCount": 0,
+    "noteOnConsensus": ""
   },
   "keyThemes": [
-    {"theme": "<theme_name>", "sentiment": "<POSITIVE|NEGATIVE|NEUTRAL>", "timeframe": "<Short-term|Long-term>", "detail": "<brief_detail>"}
+    {"theme": "", "sentiment": "NEUTRAL", "timeframe": "Short-term", "detail": ""}
   ],
   "bullCatalysts": [
-    {"catalyst": "<catalyst_name>", "probability": "<High|Medium|Low>", "potentialImpact": "<brief_detail>"}
+    {"catalyst": "", "probability": "Medium", "potentialImpact": ""}
   ],
   "bearCatalysts": [
-    {"catalyst": "<catalyst_name>", "probability": "<High|Medium|Low>", "potentialImpact": "<brief_detail>"}
+    {"catalyst": "", "probability": "Medium", "potentialImpact": ""}
   ],
   "macroExposure": [
-    {"factor": "<factor_name>", "exposure": "<POSITIVE|NEGATIVE|NEUTRAL>", "detail": "<brief_detail>"}
+    {"factor": "", "exposure": "NEUTRAL", "detail": ""}
   ],
   "institutionalActivity": {
-    "shortInterestTrend": "<Decreasing|Stable|Increasing>",
-    "shortSqueezeRisk": "<Low|Medium|High>",
-    "institutionalOwnershipNote": "<brief_note>"
+    "shortInterestTrend": "Stable",
+    "shortSqueezeRisk": "Low",
+    "institutionalOwnershipNote": ""
   },
   "upcomingEvents": [
-    {"event": "<event_name>", "expectedDate": "<e.g., Next Quarter>", "marketImplications": "<brief_detail>"}
+    {"event": "Earnings Call", "expectedDate": "Next Quarter", "marketImplications": ""}
   ],
-  "tradingNote": "<30_to_60_day_outlook>"
+  "tradingNote": ""
 }`
   };
 }
