@@ -45,7 +45,9 @@
       "Bash(xxd)",
       "Bash(npm view:*)",
       "Bash(npm ls:*)",
-      "Bash(npm audit:*)"
+      "Bash(npm audit:*)",
+      "Bash(,/)",
+      "Bash(sed -i \"78s/\\),`,/\\),\\\\` },/\" /mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main/components/tabs/DCFValuation.js)"
     ]
   },
   "enableAllProjectMcpServers": true,

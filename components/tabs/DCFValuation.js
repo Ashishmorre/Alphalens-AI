@@ -42,11 +42,11 @@ export default function DCFValuation({ data, currency }) {
         {/* Bridge: EV breakdown */}
         <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(0,212,170,0.08)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
           {[
-            { label: 'PV of FCFs', value: formatNumber(d.pvFCFs) },
-            { label: 'Terminal Value (TV)', value: formatNumber(d.terminalValue) },
-            { label: 'PV of TV', value: formatNumber(d.pvTerminalValue) },
-            { label: 'Enterprise Value', value: formatNumber(d.enterpriseValue) },
-            { label: 'Equity Value', value: formatNumber(d.equityValue) },
+            { label: 'PV of FCFs', value: formatNumber(d.pvFCFs, 2, currency) },
+            { label: 'Terminal Value (TV)', value: formatNumber(d.terminalValue, 2, currency) },
+            { label: 'PV of TV', value: formatNumber(d.pvTerminalValue, 2, currency) },
+            { label: 'Enterprise Value', value: formatNumber(d.enterpriseValue, 2, currency) },
+            { label: 'Equity Value', value: formatNumber(d.equityValue, 2, currency) },
             { label: 'Margin of Safety', value: `${d.marginOfSafety?.toFixed(1)}%`, color: d.marginOfSafety > 0 ? 'var(--gain)' : 'var(--loss)' },
           ].map(({ label, value, color }) => (
             <div key={label} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.04)' }}>
@@ -71,13 +71,13 @@ export default function DCFValuation({ data, currency }) {
               </thead>
               <tbody>
                 {[
-                  { key: 'revenue', label: 'Revenue', fmt: formatNumber },
-                  { key: 'ebitda', label: 'EBITDA', fmt: formatNumber },
-                  { key: 'ebit', label: 'EBIT', fmt: formatNumber },
-                  { key: 'nopat', label: 'NOPAT', fmt: formatNumber },
-                  { key: 'capex', label: 'CapEx', fmt: (v) => `(${formatNumber(Math.abs(v))})` },
-                  { key: 'nwcChange', label: 'NWC Change', fmt: formatNumber },
-                  { key: 'fcf', label: 'Free Cash Flow', fmt: formatNumber, highlight: true },
+                  { key: 'revenue', label: 'Revenue', fmt: (v) => formatNumber(v, 2, currency) },
+                  { key: 'ebitda', label: 'EBITDA', fmt: (v) => formatNumber(v, 2, currency) },
+                  { key: 'ebit', label: 'EBIT', fmt: (v) => formatNumber(v, 2, currency) },
+                  { key: 'nopat', label: 'NOPAT', fmt: (v) => formatNumber(v, 2, currency) },
+                  { key: 'capex', label: 'CapEx', fmt: (v) => `(${formatNumber(Math.abs(v), 2, currency)})` },
+                  { key: 'nwcChange', label: 'NWC Change', fmt: (v) => formatNumber(v, 2, currency) },
+                  { key: 'fcf', label: 'Free Cash Flow', fmt: (v) => formatNumber(v, 2, currency), highlight: true },
                 ].map(({ key, label, fmt, highlight }) => (
                   <tr key={key} style={highlight ? { background: 'rgba(0,212,170,0.04)' } : {}}>
                     <td style={{ color: highlight ? 'var(--teal)' : 'var(--txt-secondary)', fontWeight: highlight ? 500 : 400 }}>{label}</td>
