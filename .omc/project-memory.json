@@ -1,0 +1,330 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775978561802,
+  "projectRoot": "/mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "JavaScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "jsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "next",
+        "version": "16.2.3",
+        "category": "fullstack"
+      },
+      {
+        "name": "react",
+        "version": "18",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "18",
+        "category": "frontend"
+      },
+      {
+        "name": "jest",
+        "version": "29.7.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "next dev",
+      "build": "next build",
+      "start": "next start",
+      "lint": "next lint",
+      "test": "jest",
+      "test:watch": "jest --watch"
+    }
+  },
+  "conventions": {
+    "namingStyle": "camelCase",
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "__tests__",
+      "app",
+      "components",
+      "docs",
+      "lib"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "__tests__": {
+      "path": "__tests__",
+      "purpose": "Test files",
+      "fileCount": 1,
+      "lastAccessed": 1775978561742,
+      "keyFiles": [
+        "financial-utils.test.js"
+      ]
+    },
+    "app": {
+      "path": "app",
+      "purpose": "Application code",
+      "fileCount": 3,
+      "lastAccessed": 1775978561751,
+      "keyFiles": [
+        "globals.css",
+        "layout.js",
+        "page.js"
+      ]
+    },
+    "components": {
+      "path": "components",
+      "purpose": "UI components",
+      "fileCount": 7,
+      "lastAccessed": 1775978561758,
+      "keyFiles": [
+        "CompareStocks.js",
+        "ErrorBoundary.js",
+        "ExportPDF.js",
+        "Header.js",
+        "LoadingCard.js"
+      ]
+    },
+    "contexts": {
+      "path": "contexts",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1775978561765,
+      "keyFiles": [
+        "CurrencyContext.js",
+        "DCFContext.js"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 1,
+      "lastAccessed": 1775978561772,
+      "keyFiles": [
+        "ARCHITECTURE.md"
+      ]
+    },
+    "lib": {
+      "path": "lib",
+      "purpose": "Library code",
+      "fileCount": 16,
+      "lastAccessed": 1775978561778,
+      "keyFiles": [
+        "ai-normalizer.js",
+        "api-client.js",
+        "api-utils.js",
+        "cache.js",
+        "client-utils.js"
+      ]
+    },
+    "app/api": {
+      "path": "app/api",
+      "purpose": "API routes",
+      "fileCount": 0,
+      "lastAccessed": 1775978561790,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "app/api/analyze/route.js",
+      "accessCount": 79,
+      "lastAccessed": 1776002270134,
+      "type": "file"
+    },
+    {
+      "path": "lib/nse-xbrl-parser.js",
+      "accessCount": 32,
+      "lastAccessed": 1775985223513,
+      "type": "file"
+    },
+    {
+      "path": "app/api/stock/route.js",
+      "accessCount": 13,
+      "lastAccessed": 1775992416149,
+      "type": "file"
+    },
+    {
+      "path": "lib/financial-utils.js",
+      "accessCount": 13,
+      "lastAccessed": 1776000396807,
+      "type": "file"
+    },
+    {
+      "path": "lib/ai-normalizer.js",
+      "accessCount": 10,
+      "lastAccessed": 1776000501206,
+      "type": "file"
+    },
+    {
+      "path": "lib/yahoo-finance.js",
+      "accessCount": 8,
+      "lastAccessed": 1775989368570,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 7,
+      "lastAccessed": 1775991788983,
+      "type": "directory"
+    },
+    {
+      "path": "lib/rate-limit.js",
+      "accessCount": 6,
+      "lastAccessed": 1775993396147,
+      "type": "file"
+    },
+    {
+      "path": "lib/screener-scraper.js",
+      "accessCount": 5,
+      "lastAccessed": 1775992351951,
+      "type": "file"
+    },
+    {
+      "path": "lib/dedupe.js",
+      "accessCount": 4,
+      "lastAccessed": 1775993354402,
+      "type": "file"
+    },
+    {
+      "path": "app/page.js",
+      "accessCount": 4,
+      "lastAccessed": 1776000488091,
+      "type": "file"
+    },
+    {
+      "path": "contexts/DCFContext.js",
+      "accessCount": 4,
+      "lastAccessed": 1776000676559,
+      "type": "file"
+    },
+    {
+      "path": "components/tabs/RiskRatios.js",
+      "accessCount": 3,
+      "lastAccessed": 1775989287077,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 3,
+      "lastAccessed": 1775992187327,
+      "type": "file"
+    },
+    {
+      "path": "components/tabs/SensitivityTable.js",
+      "accessCount": 3,
+      "lastAccessed": 1776000428962,
+      "type": "file"
+    },
+    {
+      "path": "components/ExportPDF.js",
+      "accessCount": 2,
+      "lastAccessed": 1775978754125,
+      "type": "file"
+    },
+    {
+      "path": "lib/api-client.js",
+      "accessCount": 2,
+      "lastAccessed": 1775992554828,
+      "type": "file"
+    },
+    {
+      "path": "lib/rate-limit-redis.js",
+      "accessCount": 2,
+      "lastAccessed": 1775993336389,
+      "type": "file"
+    },
+    {
+      "path": "components/tabs/InvestmentThesis.js",
+      "accessCount": 2,
+      "lastAccessed": 1775999706467,
+      "type": "file"
+    },
+    {
+      "path": "components/tabs/NewsSentiment.js",
+      "accessCount": 2,
+      "lastAccessed": 1775999748231,
+      "type": "file"
+    },
+    {
+      "path": "lib/json-parser.js",
+      "accessCount": 2,
+      "lastAccessed": 1776000414467,
+      "type": "file"
+    },
+    {
+      "path": "components/tabs/DCFValuation.js",
+      "accessCount": 2,
+      "lastAccessed": 1776000421790,
+      "type": "file"
+    },
+    {
+      "path": "__tests__/financial-utils.test.js",
+      "accessCount": 1,
+      "lastAccessed": 1775985007027,
+      "type": "file"
+    },
+    {
+      "path": "lib",
+      "accessCount": 1,
+      "lastAccessed": 1775986287636,
+      "type": "directory"
+    },
+    {
+      "path": "components",
+      "accessCount": 1,
+      "lastAccessed": 1775987402692,
+      "type": "directory"
+    },
+    {
+      "path": "lib/sector-validator.js",
+      "accessCount": 1,
+      "lastAccessed": 1775990681371,
+      "type": "file"
+    },
+    {
+      "path": "app",
+      "accessCount": 1,
+      "lastAccessed": 1775991810752,
+      "type": "directory"
+    },
+    {
+      "path": "app/api/analyze",
+      "accessCount": 1,
+      "lastAccessed": 1776001368686,
+      "type": "directory"
+    }
+  ],
+  "userDirectives": []
+}

@@ -18,6 +18,63 @@ import {
   calculateNOPAT,
 } from '@/lib/financial-utils'
 
+/**
+ * Generate default 5-year projections when API doesn't provide any
+ * Uses conservative assumptions based on available stock data
+ */
+function generateDefaultProjections(stockData, wacc, terminalGrowthRate) {
+  const baseRevenue = stockData?.revenue || 1000000000
+  const taxRate = stockData?.assumptions?.taxRate || 21
+  const revenueGrowthRates = stockData?.assumptions?.revenueGrowthRates || [10, 10, 10, 10, 10]
+  const ebitdaMargins = stockData?.assumptions?.ebitdaMargins || [20, 20, 20, 20, 20]
+
+  const projections = []
+
+  for (let i = 0; i < 5; i++) {
+    const year = i + 1
+    const growthRate = revenueGrowthRates[i] || 10
+    const ebitdaMargin = ebitdaMargins[i] || 20
+
+    // Calculate values
+    const revenue = baseRevenue * Math.pow(1 + growthRate / 100, year)
+    const ebitda = calculateEBITDA(revenue, ebitdaMargin)
+
+    // Estimate EBIT (typically 70-80% of EBITDA for mature companies)
+    const ebit = ebitda * 0.75
+
+    // Calculate NOPAT
+    const nopat = calculateNOPAT(ebit, taxRate)
+
+    // Estimate CapEx (typically 5-10% of revenue)
+    const capex = -revenue * 0.08
+
+    // Estimate NWC change (typically 2-4% of revenue change)
+    const prevRevenue = i === 0 ? baseRevenue : projections[i - 1].revenue
+    const nwcChange = (revenue - prevRevenue) * 0.03
+
+    // Calculate FCF
+    const depreciation = ebitda - ebit
+    const fcf = calculateFCF(nopat, depreciation, capex, nwcChange)
+
+    // Calculate PV of FCF
+    const pvFCF = calculatePV(fcf, wacc, year)
+
+    projections.push({
+      year,
+      revenue,
+      ebitda,
+      ebit,
+      nopat,
+      capex,
+      nwcChange,
+      fcf,
+      pvFCF,
+    })
+  }
+
+  return projections
+}
+
 const DCFContext = createContext(undefined)
 
 /**
@@ -51,23 +108,19 @@ export function DCFProvider({ children, rawApiData }) {
 
     const { projectedCashFlows, wacc, terminalGrowthRate, currentPrice, sharesOutstanding } = safeData
 
-    // Validate required data
-    if (!projectedCashFlows.length) {
-      return safeData.originalData
-    }
+    // If no projections from API, create default projections based on stock data
+    const projections = projectedCashFlows.length > 0
+      ? projectedCashFlows.map((p) => {
+          const depreciation = (p.ebitda || 0) - (p.ebit || 0)
+          const calculatedFCF = calculateFCF(p.nopat || 0, depreciation, p.capex || 0, p.nwcChange || 0)
 
-    // Ensure all projections have correctly calculated FCF based on the formula:
-    // FCF = NOPAT + D&A - CapEx - Change in NWC
-    const projections = projectedCashFlows.map((p) => {
-      const depreciation = (p.ebitda || 0) - (p.ebit || 0)
-      const calculatedFCF = calculateFCF(p.nopat || 0, depreciation, p.capex || 0, p.nwcChange || 0)
-
-      return {
-        ...p,
-        fcf: calculatedFCF, // Override any API-provided FCF with calculated value
-        pvFCF: calculatePV(calculatedFCF, wacc, p.year || 1),
-      }
-    })
+          return {
+            ...p,
+            fcf: calculatedFCF, // Override any API-provided FCF with calculated value
+            pvFCF: calculatePV(calculatedFCF, wacc, p.year || 1),
+          }
+        })
+      : generateDefaultProjections(safeData.originalData, wacc, terminalGrowthRate)
 
     // Calculate summary values from projections (single source of truth)
     const pvFCFs = projections.reduce((sum, p) => sum + (p.pvFCF || 0), 0)
@@ -101,6 +154,10 @@ export function DCFProvider({ children, rawApiData }) {
 
     const marginOfSafety = calculateMarginOfSafety(intrinsicValuePerShare, currentPrice)
 
+    // Generate sensitivity table if not provided by API
+    const sensitivityTable = safeData.originalData?.sensitivityTable ||
+      calculateSensitivity(intrinsicValuePerShare, currentPrice, [8, 9, 10, 11, 12], [1.5, 2.0, 2.5, 3.0, 3.5])
+
     return {
       ...safeData.originalData,
       projections,
@@ -115,8 +172,9 @@ export function DCFProvider({ children, rawApiData }) {
       verdict,
       dcfRating,
       marginOfSafety,
+      sensitivityTable,
     }
-  }, [safeData])
+  }, [safeData, calculateSensitivity])
 
   // Helper to recalculate sensitivity table
   const calculateSensitivity = useCallback((baseIntrinsicValue, currentPrice, waccRange, tgrRange) => {

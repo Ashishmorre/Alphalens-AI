@@ -295,7 +295,7 @@ Return ONLY JSON matching this EXACT structure (field names must match):
   "qualityRatios": [
     {"metric": "ROE", "value": "${roe}", "benchmark": "12.0%", "rating": "${d.roe > 0.15 ? 'EXCELLENT' : d.roe > 0.10 ? 'GOOD' : 'AVERAGE'}"},
     {"metric": "Current Ratio", "value": "${currentRatio}x", "benchmark": "1.5x", "rating": "${Number(currentRatio) > 2 ? 'EXCELLENT' : Number(currentRatio) > 1.5 ? 'GOOD' : 'AVERAGE'}"},
-  {"metric": "FCF Margin", "value": "${d.freeCashFlow && d.revenue ? ((d.freeCashFlow / d.revenue) * 100).toFixed(1) + '%' : '—'}", "benchmark": "10%", "rating": "AVERAGE"}
+    {"metric": "FCF Margin", "value": "${d.freeCashFlow && d.revenue ? ((d.freeCashFlow / d.revenue) * 100).toFixed(1) + '%' : '—'}", "benchmark": "10%", "rating": "AVERAGE"}
   ],
   "leverageRatios": [
     {"metric": "Debt/Equity", "value": "${debtEq}x", "threshold": "1.0x", "risk": "${Number(debtEq) > 1.5 ? 'HIGH' : Number(debtEq) > 0.8 ? 'MEDIUM' : 'LOW'}"}
@@ -307,8 +307,8 @@ Return ONLY JSON matching this EXACT structure (field names must match):
   ],
   "peerBenchmarks": [
     {"ticker": "PEER1", "name": "Peer Company 1", "pe": "${pe}x", "evEbitda": "${evEbitda}x", "margin": "N/A"},
-  {"ticker": "PEER2", "name": "Peer Company 2", "pe": "${Number(pe) * 0.9}x", "evEbitda": "${Number(evEbitda) * 0.95}x", "margin": "N/A"},
-  {"ticker": "PEER3", "name": "Peer Company 3", "pe": "${Number(pe) * 1.1}x", "evEbitda": "${Number(evEbitda) * 1.05}x", "margin": "N/A"}
+    {"ticker": "PEER2", "name": "Peer Company 2", "pe": "${Number(pe) * 0.9}x", "evEbitda": "${Number(evEbitda) * 0.95}x", "margin": "N/A"},
+    {"ticker": "PEER3", "name": "Peer Company 3", "pe": "${Number(pe) * 1.1}x", "evEbitda": "${Number(evEbitda) * 1.05}x", "margin": "N/A"}
   ]
 }`
   }

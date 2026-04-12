@@ -1,0 +1,127 @@
+{
+  "updatedAt": "2026-04-12T13:57:57.133Z",
+  "missions": [
+    {
+      "id": "session:e037b7ae-6482-417a-88b6-97992eace0ec:none",
+      "source": "session",
+      "name": "none",
+      "objective": "Session mission",
+      "createdAt": "2026-04-12T07:47:36.164Z",
+      "updatedAt": "2026-04-12T13:57:57.133Z",
+      "status": "done",
+      "workerCount": 6,
+      "taskCounts": {
+        "total": 6,
+        "pending": 0,
+        "blocked": 0,
+        "inProgress": 0,
+        "completed": 6,
+        "failed": 0
+      },
+      "agents": [
+        {
+          "name": "executor:af66a4b",
+          "role": "executor",
+          "ownership": "af66a4b149da48f9f",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-12T07:52:28.373Z"
+        },
+        {
+          "name": "executor:a7954fa",
+          "role": "executor",
+          "ownership": "a7954fac5cc3606d1",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-12T07:51:56.992Z"
+        },
+        {
+          "name": "executor:a0c52cf",
+          "role": "executor",
+          "ownership": "a0c52cf368fcaa347",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-12T09:14:04.382Z"
+        },
+        {
+          "name": "executor:a5b2505",
+          "role": "executor",
+          "ownership": "a5b25050217c4d058",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-12T09:09:45.013Z"
+        },
+        {
+          "name": "executor:a894d01",
+          "role": "executor",
+          "ownership": "a894d0199b5514a10",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-12T13:34:07.393Z"
+        },
+        {
+          "name": "executor:a27d093",
+          "role": "executor",
+          "ownership": "a27d093ec75cf8389",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-12T13:57:57.133Z"
+        }
+      ],
+      "timeline": [
+        {
+          "id": "session-stop:a0c52cf368fcaa347:2026-04-12T09:14:04.382Z",
+          "at": "2026-04-12T09:14:04.382Z",
+          "kind": "completion",
+          "agent": "executor:a0c52cf",
+          "detail": "completed",
+          "sourceKey": "session-stop:a0c52cf368fcaa347"
+        },
+        {
+          "id": "session-start:a894d0199b5514a10:2026-04-12T13:26:29.908Z",
+          "at": "2026-04-12T13:26:29.908Z",
+          "kind": "update",
+          "agent": "executor:a894d01",
+          "detail": "started executor:a894d01",
+          "sourceKey": "session-start:a894d0199b5514a10"
+        },
+        {
+          "id": "session-start:a27d093ec75cf8389:2026-04-12T13:26:30.012Z",
+          "at": "2026-04-12T13:26:30.012Z",
+          "kind": "update",
+          "agent": "executor:a27d093",
+          "detail": "started executor:a27d093",
+          "sourceKey": "session-start:a27d093ec75cf8389"
+        },
+        {
+          "id": "session-stop:a894d0199b5514a10:2026-04-12T13:34:07.393Z",
+          "at": "2026-04-12T13:34:07.393Z",
+          "kind": "completion",
+          "agent": "executor:a894d01",
+          "detail": "completed",
+          "sourceKey": "session-stop:a894d0199b5514a10"
+        },
+        {
+          "id": "session-stop:a27d093ec75cf8389:2026-04-12T13:57:57.133Z",
+          "at": "2026-04-12T13:57:57.133Z",
+          "kind": "completion",
+          "agent": "executor:a27d093",
+          "detail": "completed",
+          "sourceKey": "session-stop:a27d093ec75cf8389"
+        }
+      ]
+    }
+  ]
+}
