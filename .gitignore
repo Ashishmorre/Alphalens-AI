@@ -38,3 +38,5 @@ next-env.d.ts
 #MCP Server
 /.claude/
 /.code-review-graph/
+# OMC state files
+.omc/

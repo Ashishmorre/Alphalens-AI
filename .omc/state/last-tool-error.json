@@ -1,7 +1,0 @@
-{
-  "tool_name": "mcp__plugin_oh-my-claudecode_t__lsp_diagnostics",
-  "tool_input_preview": "{\"file\":\"/mnt/c/Users/aman2/OneDrive/Desktop/AI/DCF/Alphalens-AI-main/contexts/DCFContext.js\"}",
-  "error": "Language server 'typescript-language-server' not found.\nInstall with: npm install -g typescript-language-server typescript",
-  "timestamp": "2026-04-12T13:31:59.777Z",
-  "retry_count": 1
-}
