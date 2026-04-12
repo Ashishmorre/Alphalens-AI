@@ -230,12 +230,12 @@ function StockCard({ stock, isWinner }) {
       )}
       <div style={{ fontSize: '0.75rem', color: 'var(--teal)', fontFamily: 'var(--font-dm-mono)', marginBottom: '0.25rem' }}>{stock.ticker}</div>
       <div style={{ fontFamily: 'var(--font-playfair)', fontSize: '0.95rem', color: 'var(--txt-primary)', marginBottom: '0.5rem', lineHeight: 1.2 }}>{stock.name}</div>
-      <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.35rem', color: 'var(--txt-primary)' }}>{formatPrice(stock.price)}</div>
+      <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.35rem', color: 'var(--txt-primary)' }}>{formatPrice(stock.price, stock.currency)}</div>
       <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.8rem', color: isPositive ? 'var(--gain)' : 'var(--loss)', marginTop: '0.15rem' }}>
         {changeSign(stock.changePercent)}{stock.changePercent?.toFixed(2)}%
       </div>
       <div style={{ marginTop: '0.75rem', fontSize: '0.72rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)' }}>
-        {stock.sector} · {formatNumber(stock.marketCap)} Mktcap
+        {stock.sector} · {formatNumber(stock.marketCap, 2, stock.currency)} Mktcap
       </div>
     </div>
   )
