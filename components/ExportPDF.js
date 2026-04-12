@@ -3,12 +3,12 @@ import { useState } from 'react'
 
 import { strictValidateTicker } from '@/lib/security'
 
-function formatNum(n) {
+function formatNum(n, sym = '$') {
   if (n == null || isNaN(n)) return '—'
-  if (Math.abs(n) >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T'
-  if (Math.abs(n) >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B'
-  if (Math.abs(n) >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M'
-  return '$' + n.toFixed(2)
+  if (Math.abs(n) >= 1e12) return sym + (n / 1e12).toFixed(2) + 'T'
+  if (Math.abs(n) >= 1e9) return sym + (n / 1e9).toFixed(2) + 'B'
+  if (Math.abs(n) >= 1e6) return sym + (n / 1e6).toFixed(2) + 'M'
+  return sym + n.toFixed(2)
 }
 
 function getCurrencySymbol(currency) {
@@ -108,13 +108,13 @@ export default function ExportPDF({ stockData, analysisData, activeTab }) {
 
       // ─── Key stats grid ────────────────────────────────────────────────
       const stats = [
-        ['Market Cap', formatNum(stockData.marketCap)],
+        ['Market Cap', formatNum(stockData.marketCap, sym)],
         ['P/E (TTM)', stockData.pe?.toFixed(1) || '—'],
         ['EV/EBITDA', stockData.evToEbitda?.toFixed(1) || '—'],
         ['ROE', stockData.roe ? (stockData.roe * 100).toFixed(1) + '%' : '—'],
         ['Net Margin', stockData.profitMargin ? (stockData.profitMargin * 100).toFixed(1) + '%' : '—'],
-        ['Revenue', formatNum(stockData.revenue)],
-        ['FCF', formatNum(stockData.freeCashFlow)],
+        ['Revenue', formatNum(stockData.revenue, sym)],
+        ['FCF', formatNum(stockData.freeCashFlow, sym)],
         ['Beta', stockData.beta?.toFixed(2) || '—'],
       ]
 
@@ -188,7 +188,7 @@ export default function ExportPDF({ stockData, analysisData, activeTab }) {
             y = addText('5-Year Projections:', margin, y + 12, 10, [0, 212, 170], true)
             d.projections.forEach(p => {
               checkPage(18)
-              y = addText(`Year ${p.year}: Revenue ${formatNum(p.revenue)} · EBITDA ${formatNum(p.ebitda)} · FCF ${formatNum(p.fcf)}`, margin + 10, y + 5, 8, [130, 165, 195])
+              y = addText(`Year ${p.year}: Revenue ${formatNum(p.revenue, sym)} · EBITDA ${formatNum(p.ebitda, sym)} · FCF ${formatNum(p.fcf, sym)}`, margin + 10, y + 5, 8, [130, 165, 195])
             })
           }
           if (d.keyRisksToModel?.length) {
