@@ -106,6 +106,7 @@ CURRENT INPUT DATA (do not deviate from these base numbers):
 - Shares Outstanding: ${d.sharesOutstanding || 'estimate based on market cap'}
 
 CRITICAL MATH RULES - ANY VIOLATION RENDERS OUTPUT USELESS:
+
 1. All projections MUST scale logically from the CURRENT DATA provided above.
 2. DO NOT jump magnitudes arbitrarily (e.g., if Revenue is in Billions, projections stay in Billions).
 3. intrinsicValuePerShare MUST logically correlate with enterpriseValue and outstanding shares.
@@ -160,97 +161,132 @@ REQUIREMENTS:
 }
 
 function buildRiskPrompt(ticker, d) {
-  const price = d.price?.toFixed?.(2) || 'N/A';
-  const pe = d.pe?.toFixed?.(2) || '—';
-  const fwdPe = d.forwardPE?.toFixed?.(2) || '—';
-  const evEbitda = d.evToEbitda?.toFixed?.(2) || '—';
-  const debtEq = d.debtToEquity?.toFixed?.(2) || '—';
-  const roe = d.roe ? (d.roe * 100).toFixed(2) + '%' : '—';
-  const currentRatio = d.currentRatio?.toFixed?.(2) || '—';
+  const price = d.price?.toFixed?.(2) || 'N/A'
+  const pe = d.pe?.toFixed?.(2) || '—'
+  const fwdPe = d.forwardPE?.toFixed?.(2) || '—'
+  const evEbitda = d.evToEbitda?.toFixed?.(2) || '—'
+  const debtEq = d.debtToEquity?.toFixed?.(2) || '—'
+  const roe = d.roe ? (d.roe * 100).toFixed(2) + '%' : '—'
+  const currentRatio = d.currentRatio?.toFixed?.(2) || '—'
+  const marketCap = fmtNumber(d.marketCap)
+  const fcf = fmtNumber(d.freeCashFlow)
 
-  // Technical indicators injection
-  const ma50 = d.fiftyDayAverage?.toFixed?.(2) || '—';
-  const ma200 = d.twoHundredDayAverage?.toFixed?.(2) || '—';
-  const weekHigh52 = d.weekHigh52?.toFixed?.(2) || '—';
-  const weekLow52 = d.weekLow52?.toFixed?.(2) || '—';
-  const avgVolume = d.avgVolume ? fmtNumber(d.avgVolume) : '—';
-  const volume = d.volume ? fmtNumber(d.volume) : '—';
+  // Calculate technicals from raw data
+  const ma50 = d.fiftyDayAverage || 0
+  const ma200 = d.twoHundredDayAverage || 0
+  const weekHigh52 = d.weekHigh52 || 0
+  const weekLow52 = d.weekLow52 || 0
+  const volume = d.volume || 0
+  const avgVolume = d.avgVolume || 0
+
+  // Calculate momentum indicators
+  const priceVs50DMA = ma50 > 0 && d.price ? ((d.price - ma50) / ma50 * 100).toFixed(1) : '0'
+  const priceVs200DMA = ma200 > 0 && d.price ? ((d.price - ma200) / ma200 * 100).toFixed(1) : '0'
+  const weekPosition52 = weekHigh52 > weekLow52 && d.price ? ((d.price - weekLow52) / (weekHigh52 - weekLow52) * 100).toFixed(0) : '50'
+
+  // Volume signal
+  let volumeSignal = 'Normal'
+  if (volume && avgVolume) {
+    const ratio = volume / avgVolume
+    volumeSignal = ratio > 1.2 ? 'Above Average' : ratio < 0.8 ? 'Below Average' : 'Normal'
+  }
+
+  // Trend determination
+  let trend = 'NEUTRAL'
+  if (d.price) {
+    if (ma50 > ma200 && d.price > ma50) trend = 'BULLISH'
+    else if (ma50 < ma200 && d.price < ma50) trend = 'BEARISH'
+  }
+
+  // Support/Resistance levels
+  const support = ma50 > 0 ? ma50 : weekLow52
+  const resistance = ma200 > 0 ? ma200 : weekHigh52
 
   return {
     system: 'You are a Quantitative Risk Analyst. Return ONLY valid JSON. NEVER use markdown backticks.',
     user: `Analyze risk metrics and financial health for ${ticker}.
 
-CURRENT DATA:
+INJECTED FINANCIAL DATA (MUST USE THESE EXACT VALUES):
 - Current Price: ${price}
-- P/E (TTM): ${pe}
-- Forward P/E: ${fwdPe}
+- Market Cap: ${marketCap}
+- P/E (TTM): ${pe}x
+- Forward P/E: ${fwdPe}x
 - EV/EBITDA: ${evEbitda}
 - Debt to Equity: ${debtEq}
 - ROE: ${roe}
+- Free Cash Flow: ${fcf}
 - Current Ratio: ${currentRatio}
 - Beta: ${d.beta?.toFixed?.(2) || '—'}
 
-TECHNICAL INDICATORS:
-- 50-Day MA: ${ma50}
-- 200-Day MA: ${ma200}
-- 52-Week High: ${weekHigh52}
-- 52-Week Low: ${weekLow52}
-- Volume: ${volume}
-- Avg Volume (3M): ${avgVolume}
+INJECTED TECHNICAL DATA (PRE-CALCULATED):
+- Trend: ${trend}
+- Price vs 50DMA: ${priceVs50DMA}%
+- Price vs 200DMA: ${priceVs200DMA}%
+- 52-Week Position: ${weekPosition52}%
+- 52-Week Range: ${weekLow52} - ${weekHigh52}
+- Volume Signal: ${volumeSignal}
+- Support Level: ${support}
+- Resistance Level: ${resistance}
 
 CRITICAL RULES:
-1. For valuationRatios, qualityRatios, and leverageRatios, you MUST use the exact 'CURRENT DATA' values provided above. Do not invent them.
-2. For technicals, USE the injected indicator values (50DMA, 200DMA, 52W High/Low). support should use 50DMA or 52W Low, resistance should use 200DMA or 52W High.
-3. Risk Factors MUST include: Liquidity Risk (based on Current Ratio), Leverage Risk (based on Debt/Equity), and Valuation Risk (based on P/E).
-4. REPLACE all '0', '—', and empty string '""' values in the JSON template below with your own highly accurate analysis. DO NOT output 0 unless it is the actual calculated value.
-5. overallRiskScore & overallQualityScore MUST be between 1 and 10.
-6. Provide realistic sector averages for the benchmarks.
+1. USE ALL injected data EXACTLY as provided. Do NOT invent new values.
+2. Risk Factors MUST analyze based on: Liquidity (Current Ratio), Leverage (D/E), Valuation (P/E).
+3. REPLACE all placeholders with YOUR analysis - generic descriptions are FORBIDDEN.
+4. overallRiskScore & overallQualityScore MUST be integers 1-10.
+5. Peer tickers MUST support ${d.currency || 'USD'} trading and be in ${d.sector || 'same sector'}.
 
-Return ONLY JSON matching this exact structure:
+Return ONLY JSON matching this EXACT structure (field names must match):
 {
+  "overallRiskScore": ${Math.max(1, Math.min(10, Math.round((d.beta || 1) * 5)))},
+  "overallQualityScore": ${Math.max(1, Math.min(10, Math.round((d.roe || 0.12) * 100 / 2)))},
+  "riskSummary": "Write a 2-sentence institutional summary of risk profile using injected data.",
+  "technicals": {
+    "trend": "${trend}",
+    "momentum": "${Number(priceVs50DMA) > 0 ? 'UPTREND' : Number(priceVs50DMA) < 0 ? 'DOWNTREND' : 'NEUTRAL'}",
+    "technicalRating": "${Number(priceVs200DMA) > 5 ? 'BULLISH' : Number(priceVs200DMA) < -5 ? 'BEARISH' : 'NEUTRAL'}",
+    "priceVs50DMA": "${priceVs50DMA}",
+    "priceVs200DMA": "${priceVs200DMA}",
+    "weekPosition52": "${weekPosition52}",
+    "keyLevels": {
+      "support": ${support},
+      "resistance": ${resistance}
+    }
+  },
   "valuationRatios": [
-    {"name": "P/E", "value": "${pe}x", "benchmark": "0.0x"}
+    {"metric": "P/E (TTM)", "value": "${pe}x", "sectorMedian": "0.0x", "assessment": "FAIR", "note": "Analysis based on sector"},
+    {"metric": "Forward P/E", "value": "${fwdPe}x", "sectorMedian": "0.0x", "assessment": "FAIR", "note": "Analysis based on growth"},
+    {"metric": "EV/EBITDA", "value": "${evEbitda}x", "sectorMedian": "0.0x", "assessment": "FAIR", "note": "Analysis based on sector multiples"}
   ],
   "qualityRatios": [
-    {"name": "ROE", "value": "${roe}", "benchmark": "0.0%"},
-    {"name": "Current Ratio", "value": "${currentRatio}x", "benchmark": "0.0x"}
+    {"metric": "ROE", "value": "${roe}", "benchmark": "12.0%", "rating": "${d.roe > 0.15 ? 'EXCELLENT' : d.roe > 0.10 ? 'GOOD' : 'AVERAGE'}"},
+    {"metric": "Current Ratio", "value": "${currentRatio}x", "benchmark": "1.5x", "rating": "${Number(currentRatio) > 2 ? 'EXCELLENT' : Number(currentRatio) > 1.5 ? 'GOOD' : 'AVERAGE'}"}
   ],
   "leverageRatios": [
-    {"name": "D/E", "value": "${debtEq}x", "benchmark": "0.0x"}
+    {"metric": "Debt/Equity", "value": "${debtEq}x", "threshold": "1.0x", "risk": "${Number(debtEq) > 1.5 ? 'HIGH' : Number(debtEq) > 0.8 ? 'MEDIUM' : 'LOW'}"}
   ],
-  "technicals": {
-    "trend": "BULLISH|BEARISH|NEUTRAL",
-    "rsi": 0,
-    "support": 0,
-    "resistance": 0,
-    "volumeSignal": ""
-  },
   "riskFactors": [
-    {"factor": "Liquidity Risk", "severity": "High|Medium|Low", "description": "Analyze based on Current Ratio."},
-    {"factor": "Leverage Risk", "severity": "High|Medium|Low", "description": "Analyze based on Debt/Equity."},
-    {"factor": "Valuation Risk", "severity": "High|Medium|Low", "description": "Analyze based on P/E vs sector."}
+    {"risk": "Liquidity Risk", "severity": "${Number(currentRatio) < 1 ? 'HIGH' : Number(currentRatio) < 1.5 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "Analyze based on current ratio of ${currentRatio}. Provide specific sector context."},
+    {"risk": "Leverage Risk", "severity": "${Number(debtEq) > 1.5 ? 'HIGH' : Number(debtEq) > 0.8 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "Analyze based on debt-to-equity of ${debtEq}. Provide specific sector context."},
+    {"risk": "Valuation Risk", "severity": "${Number(pe) > 30 ? 'HIGH' : Number(pe) > 20 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "Analyze current P/E of ${pe}x vs sector. Provide specific context."}
   ],
-  "overallRiskScore": 0,
-  "overallQualityScore": 0,
-  "riskSummary": "",
   "peerBenchmarks": [
-    {"ticker": "PEER1", "metric": "P/E", "value": "0.0x"}
+    {"ticker": "PEER1", "name": "Peer Company 1", "pe": "${pe}x", "evEbitda": "${evEbitda}x", "margin": "N/A"}
   ]
 }`
-  };
+  }
 }
 
 function buildNewsPrompt(ticker, d) {
-  const price = d.price?.toFixed?.(2) || 'N/A';
-  const target = d.targetMeanPrice?.toFixed?.(2) || 'N/A';
-  const rec = d.recommendationKey ? d.recommendationKey.toUpperCase() : 'HOLD';
+  const price = d.price?.toFixed?.(2) || 'N/A'
+  const target = d.targetMeanPrice?.toFixed?.(2) || 'N/A'
+  const rec = d.recommendationKey ? d.recommendationKey.toUpperCase() : 'HOLD'
 
   // Calculate real upside mathematically
-  let realUpside = 0;
+  let realUpside = 0
   if (d.targetMeanPrice && d.price && d.price > 0) {
-    realUpside = ((d.targetMeanPrice - d.price) / d.price) * 100;
+    realUpside = ((d.targetMeanPrice - d.price) / d.price) * 100
   }
-  const upsideStr = realUpside !== 0 ? realUpside.toFixed(2) : '0.00';
+  const upsideStr = realUpside !== 0 ? realUpside.toFixed(2) : '0.00'
 
   return {
     system: 'You are a Senior Market Sentiment Analyst. Return ONLY valid JSON. NEVER use markdown backticks.',
@@ -305,7 +341,7 @@ Return ONLY JSON matching this exact structure:
   ],
   "tradingNote": ""
 }`
-  };
+  }
 }
 
 /**
