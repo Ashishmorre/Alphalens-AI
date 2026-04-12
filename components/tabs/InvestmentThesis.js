@@ -209,12 +209,18 @@ function CaseCard({ label, title, points, target, probability, color, bg, border
           <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color, fontFamily: 'var(--font-dm-mono)' }}>{probability}% prob.</span>
         )}
       </div>
-      {title && (
+      {title ? (
         <div style={{ fontFamily: 'var(--font-playfair)', fontSize: '0.95rem', color: 'var(--txt-primary)', marginBottom: '0.75rem', lineHeight: 1.3 }}>{title}</div>
+      ) : (
+        <div style={{ fontFamily: 'var(--font-playfair)', fontSize: '0.95rem', color: 'var(--txt-muted)', marginBottom: '0.75rem', lineHeight: 1.3 }}>No scenario details available</div>
       )}
-      {target && (
+      {target ? (
         <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.1rem', color, fontWeight: 600, marginBottom: '0.625rem' }}>
           Target: {formatPrice(target, currency)}
+        </div>
+      ) : (
+        <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.1rem', color: 'var(--txt-muted)', fontWeight: 600, marginBottom: '0.625rem' }}>
+          Target: —
         </div>
       )}
       {points?.length > 0 && (
