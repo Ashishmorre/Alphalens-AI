@@ -143,7 +143,13 @@ Return a SINGLE VALID JSON OBJECT with this exact structure (numbers only):
   "sensitivityTable": {
     "waccRange": [8.0, 9.0, 10.0, 11.0, 12.0],
     "tgrRange": [1.5, 2.0, 2.5, 3.0, 3.5],
-    "values": [[150, 140, 130], [145, 135, 125]]
+    "values": [
+        [180, 165, 150, 138, 128],
+        [175, 160, 145, 134, 124],
+        [170, 155, 140, 130, 120],
+        [165, 150, 135, 125, 115],
+        [160, 145, 130, 120, 110]
+      ]
   },
   "keyRisksToModel": ["Risk 1", "Risk 2"],
   "analystNote": "Brief DCF methodology note"
@@ -156,7 +162,8 @@ REQUIREMENTS:
 4. WACC in percentage points (e.g., 10.0 for 10%)
 5. 5 projection years exactly
 6. CRITICAL: Ensure ALL calculations are mathematically consistent
-7. NO HALLUCINATIONS: If you cannot determine a value, use null or 0, never invent`,
+7. CRITICAL: sensitivityTable.values MUST be a 5x5 matrix (5 arrays, each with 5 numbers) matching waccRange.length x tgrRange.length
+8. NO HALLUCINATIONS: If you cannot determine a value, use null or 0, never invent`,
   }
 }
 
@@ -217,6 +224,7 @@ INJECTED FINANCIAL DATA (MUST USE THESE EXACT VALUES):
 - Free Cash Flow: ${fcf}
 - Current Ratio: ${currentRatio}
 - Beta: ${d.beta?.toFixed?.(2) || '—'}
+- Avg Volume: ${fmtNumber(d.avgVolume)}
 
 INJECTED TECHNICAL DATA (PRE-CALCULATED):
 - Trend: ${trend}
@@ -234,6 +242,8 @@ CRITICAL RULES:
 3. REPLACE all placeholders with YOUR analysis - generic descriptions are FORBIDDEN.
 4. overallRiskScore & overallQualityScore MUST be integers 1-10.
 5. Peer tickers MUST support ${d.currency || 'USD'} trading and be in ${d.sector || 'same sector'}.
+6. All arrays (valuationRatios, qualityRatios, leverageRatios, riskFactors, peerBenchmarks) MUST have at least 2-3 items with realistic data.
+7. peerBenchmarks MUST include at least 3 real peer companies from same sector as ${d.sector || 'the industry'}.
 
 Return ONLY JSON matching this EXACT structure (field names must match):
 {
@@ -259,7 +269,8 @@ Return ONLY JSON matching this EXACT structure (field names must match):
   ],
   "qualityRatios": [
     {"metric": "ROE", "value": "${roe}", "benchmark": "12.0%", "rating": "${d.roe > 0.15 ? 'EXCELLENT' : d.roe > 0.10 ? 'GOOD' : 'AVERAGE'}"},
-    {"metric": "Current Ratio", "value": "${currentRatio}x", "benchmark": "1.5x", "rating": "${Number(currentRatio) > 2 ? 'EXCELLENT' : Number(currentRatio) > 1.5 ? 'GOOD' : 'AVERAGE'}"}
+    {"metric": "Current Ratio", "value": "${currentRatio}x", "benchmark": "1.5x", "rating": "${Number(currentRatio) > 2 ? 'EXCELLENT' : Number(currentRatio) > 1.5 ? 'GOOD' : 'AVERAGE'}"},
+  {"metric": "FCF Margin", "value": "${d.freeCashFlow && d.revenue ? ((d.freeCashFlow / d.revenue) * 100).toFixed(1) + '%' : '—'}", "benchmark": "10%", "rating": "AVERAGE"}
   ],
   "leverageRatios": [
     {"metric": "Debt/Equity", "value": "${debtEq}x", "threshold": "1.0x", "risk": "${Number(debtEq) > 1.5 ? 'HIGH' : Number(debtEq) > 0.8 ? 'MEDIUM' : 'LOW'}"}
@@ -270,7 +281,9 @@ Return ONLY JSON matching this EXACT structure (field names must match):
     {"risk": "Valuation Risk", "severity": "${Number(pe) > 30 ? 'HIGH' : Number(pe) > 20 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "Analyze current P/E of ${pe}x vs sector. Provide specific context."}
   ],
   "peerBenchmarks": [
-    {"ticker": "PEER1", "name": "Peer Company 1", "pe": "${pe}x", "evEbitda": "${evEbitda}x", "margin": "N/A"}
+    {"ticker": "PEER1", "name": "Peer Company 1", "pe": "${pe}x", "evEbitda": "${evEbitda}x", "margin": "N/A"},
+  {"ticker": "PEER2", "name": "Peer Company 2", "pe": "${Number(pe) * 0.9}x", "evEbitda": "${Number(evEbitda) * 0.95}x", "margin": "N/A"},
+  {"ticker": "PEER3", "name": "Peer Company 3", "pe": "${Number(pe) * 1.1}x", "evEbitda": "${Number(evEbitda) * 1.05}x", "margin": "N/A"}
   ]
 }`
   }
