@@ -83,100 +83,107 @@ const DCFContext = createContext(undefined)
  * Both Summary Cards and Projections Table read from the same derived state.
  */
 export function DCFProvider({ children, rawApiData }) {
-  // 1. Sanitize incoming API data (The Single Source of Truth)
+  // 1. Calculate all DCF projections in JavaScript - hard decouple from AI
   const safeData = useMemo(() => {
     if (!rawApiData) return null
 
     const d = rawApiData
 
-    return {
-      currentPrice: d?.currentPrice || 0,
-      wacc: d?.assumptions?.wacc || 10,
-      terminalGrowthRate: d?.assumptions?.terminalGrowthRate || 2.5,
-      sharesOutstanding: d?.sharesOutstanding || d?.assumptions?.sharesOutstanding || 1,
-      currency: d?.ticker?.endsWith('.NS') || d?.ticker?.endsWith('.BO') ? 'INR' : 'USD',
-      // Ensure cashflows are an array to prevent .map() crashes
-      projectedCashFlows: Array.isArray(d?.projections) ? d.projections : [],
-      // Original data for pass-through
-      originalData: d,
+    // Extract base values with defaults
+    const baseRevenue = d?.revenue || 1000000000
+    const baseEbitda = d?.ebitda || 200000000
+    const growthRate = 1.08 // 8% growth rate
+    const wacc = d?.assumptions?.wacc || 10
+    const terminalGrowthRate = d?.assumptions?.terminalGrowthRate || 2.5
+    const taxRate = d?.assumptions?.taxRate || 21
+    const sharesOutstanding = d?.sharesOutstanding || d?.assumptions?.sharesOutstanding || 1
+
+    // Generate calculated projections for years 1-5
+    const calculatedProjections = []
+    for (let i = 0; i < 5; i++) {
+      const year = i + 1
+
+      // Revenue grows at 8% annually
+      const revenue = baseRevenue * Math.pow(growthRate, year)
+
+      // EBITDA margin based on base relationship
+      const ebitdaMargin = baseEbitda / baseRevenue
+      const ebitda = revenue * ebitdaMargin
+
+      // EBIT is EBITDA minus depreciation (estimate 12% of EBITDA)
+      const depreciation = ebitda * 0.12
+      const ebit = ebitda - depreciation
+
+      // NOPAT
+      const nopat = calculateNOPAT(ebit, taxRate)
+
+      // CapEx (estimate 8% of revenue)
+      const capex = -revenue * 0.08
+
+      // NWC change (estimate 3% of revenue change)
+      const prevRevenue = i === 0 ? baseRevenue : calculatedProjections[i - 1].revenue
+      const nwcChange = (revenue - prevRevenue) * 0.03
+
+      // Free Cash Flow
+      const fcf = calculateFCF(nopat, depreciation, capex, nwcChange)
+
+      // Discount factor and PV of FCF
+      const discountFactor = Math.pow(1 + wacc / 100, year)
+      const pvFCF = calculatePV(fcf, wacc, year)
+
+      calculatedProjections.push({
+        year,
+        revenue,
+        ebitda,
+        ebit,
+        nopat,
+        capex,
+        nwcChange,
+        fcf,
+        discountFactor,
+        pvFCF,
+      })
     }
-  }, [rawApiData])
 
-  // 2. Derive the complex math exactly once here, NOT in individual components
-  const dcfData = useMemo(() => {
-    if (!safeData) return null
-
-    const { projectedCashFlows, wacc, terminalGrowthRate, currentPrice, sharesOutstanding } = safeData
-
-    // If no projections from API, create default projections based on stock data
-    const projections = projectedCashFlows.length > 0
-      ? projectedCashFlows.map((p) => {
-          const depreciation = (p.ebitda || 0) - (p.ebit || 0)
-          const calculatedFCF = calculateFCF(p.nopat || 0, depreciation, p.capex || 0, p.nwcChange || 0)
-
-          return {
-            ...p,
-            fcf: calculatedFCF, // Override any API-provided FCF with calculated value
-            pvFCF: calculatePV(calculatedFCF, wacc, p.year || 1),
-          }
-        })
-      : generateDefaultProjections(safeData.originalData, wacc, terminalGrowthRate)
-
-    // Calculate summary values from projections (single source of truth)
-    const pvFCFs = projections.reduce((sum, p) => sum + (p.pvFCF || 0), 0)
-
-    // Get final year FCF for terminal value calculation
-    const finalProjection = projections[projections.length - 1]
+    // Calculate summary values
+    const pvFCFs = calculatedProjections.reduce((sum, p) => sum + (p.pvFCF || 0), 0)
+    const finalProjection = calculatedProjections[calculatedProjections.length - 1]
     const finalFCF = finalProjection?.fcf || 0
 
-    const years = projections.length || 5
-
+    // Terminal value calculations
     const terminalValue = calculateTerminalValue(finalFCF, wacc, terminalGrowthRate)
-    const pvTerminalValue = calculatePVTerminalValue(terminalValue, wacc, years)
+    const pvTerminalValue = calculatePVTerminalValue(terminalValue, wacc, 5)
+
+    // Enterprise and equity value
     const enterpriseValue = calculateEnterpriseValue(pvFCFs, pvTerminalValue)
-
-    // Use actual cash/debt from stock data if available
-    const totalCash = safeData.originalData?.totalCash || safeData.originalData?.assumptions?.cash || 0
-    const totalDebt = safeData.originalData?.totalDebt || safeData.originalData?.assumptions?.debt || 0
-
+    const totalCash = d?.totalCash || d?.assumptions?.cash || 0
+    const totalDebt = d?.totalDebt || d?.assumptions?.debt || 0
     const equityValue = calculateEquityValue(enterpriseValue, totalCash, totalDebt)
-
     const intrinsicValuePerShare = calculateIntrinsicValuePerShare(equityValue, sharesOutstanding)
 
-    // Always recalculate upside from raw prices using the fixed formula
-    const upside = calculateValuationSpread(currentPrice, intrinsicValuePerShare)
-
-    // Grab the corrected verdict and spread from our utility file
-    const verdict = getValuationVerdict(currentPrice, intrinsicValuePerShare)
-
-    // Derive rating from calculated upside
-    const dcfRating = calculateDCFRating(upside)
-
-    const marginOfSafety = calculateMarginOfSafety(intrinsicValuePerShare, currentPrice)
-
-    // Generate sensitivity table if not provided by API
-    const sensitivityTable = safeData.originalData?.sensitivityTable ||
-      calculateSensitivity(intrinsicValuePerShare, currentPrice, [8, 9, 10, 11, 12], [1.5, 2.0, 2.5, 3.0, 3.5])
-
     return {
-      ...safeData.originalData,
-      projections,
+      currentPrice: d?.currentPrice || 0,
+      wacc,
+      terminalGrowthRate,
+      sharesOutstanding,
+      currency: d?.ticker?.endsWith('.NS') || d?.ticker?.endsWith('.BO') ? 'INR' : 'USD',
+      // Calculated projections from JavaScript DCF math
+      calculatedProjections,
+      // Calculated summary values
       pvFCFs,
       terminalValue,
       pvTerminalValue,
       enterpriseValue,
       equityValue,
       intrinsicValuePerShare,
-      upside,
-      spreadPercentage: upside,
-      verdict,
-      dcfRating,
-      marginOfSafety,
-      sensitivityTable,
+      totalCash,
+      totalDebt,
+      // Original data for pass-through
+      originalData: d,
     }
-  }, [safeData, calculateSensitivity])
+  }, [rawApiData])
 
-  // Helper to recalculate sensitivity table
+  // Helper to recalculate sensitivity table - must be defined before use
   const calculateSensitivity = useCallback((baseIntrinsicValue, currentPrice, waccRange, tgrRange) => {
     if (!baseIntrinsicValue || !currentPrice || !waccRange || !tgrRange) {
       return null
@@ -186,9 +193,9 @@ export function DCFProvider({ children, rawApiData }) {
 
     for (const tgr of tgrRange) {
       const row = []
-      for (const wacc of waccRange) {
+      for (const w of waccRange) {
         // Calculate adjusted intrinsic value based on WACC and TGR
-        const waccAdjustment = (10 - wacc) * 0.05
+        const waccAdjustment = (10 - w) * 0.05
         const tgrAdjustment = (tgr - 2.5) * 0.03
         const adjustedValue = baseIntrinsicValue * (1 + waccAdjustment + tgrAdjustment)
         row.push(Math.max(0, adjustedValue))
@@ -202,6 +209,65 @@ export function DCFProvider({ children, rawApiData }) {
       values,
     }
   }, [])
+
+  // 2. Derive additional calculated values from safeData
+  const dcfData = useMemo(() => {
+    if (!safeData) return null
+
+    const {
+      calculatedProjections,
+      wacc,
+      terminalGrowthRate,
+      currentPrice,
+      intrinsicValuePerShare,
+      pvFCFs,
+      terminalValue,
+      pvTerminalValue,
+      enterpriseValue,
+      equityValue,
+      totalCash,
+      totalDebt,
+    } = safeData
+
+    // Always recalculate upside from raw prices using the fixed formula
+    const upside = calculateValuationSpread(currentPrice, intrinsicValuePerShare)
+
+    // Grab the corrected verdict and spread from our utility file
+    const verdict = getValuationVerdict(currentPrice, intrinsicValuePerShare)
+
+    // Derive rating from calculated upside
+    const dcfRating = calculateDCFRating(upside)
+
+    const marginOfSafety = calculateMarginOfSafety(intrinsicValuePerShare, currentPrice)
+
+    // Calculate sensitivity table using the callback
+    const sensitivityTable = calculateSensitivity(
+      intrinsicValuePerShare,
+      currentPrice,
+      [8, 9, 10, 11, 12],
+      [1.5, 2.0, 2.5, 3.0, 3.5]
+    )
+
+    return {
+      ...safeData.originalData,
+      // All DCF values calculated in JavaScript, not from AI
+      projections: calculatedProjections,
+      pvFCFs,
+      terminalValue,
+      pvTerminalValue,
+      enterpriseValue,
+      equityValue,
+      intrinsicValuePerShare,
+      totalCash,
+      totalDebt,
+      upside,
+      spreadPercentage: upside,
+      verdict,
+      dcfRating,
+      marginOfSafety,
+      sensitivityTable,
+    }
+  }, [safeData, calculateSensitivity])
 
   const value = {
     data: dcfData,

@@ -13,6 +13,7 @@ import { AnalysisLoader, RunAnalysisButton } from '../components/LoadingCard'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { apiFetch, apiPost, getErrorMessage } from '@/lib/api-client'
 import { normalizeAIResponse } from '@/lib/ai-normalizer'
+import { DCFProvider } from '@/contexts/DCFContext'
 
 const ANALYSIS_TABS = [
   { id: 'thesis', label: 'Investment Thesis' },
@@ -177,7 +178,9 @@ export default function Home() {
                       )}
                       {activeAnalysisTab === 'dcf' && (
                         <ErrorBoundary>
-                          <DCFValuation data={currentAnalysis} currency={stockData.currency} />
+                          <DCFProvider rawApiData={currentAnalysis}>
+                <DCFValuation currency={stockData.currency} />
+              </DCFProvider>
                         </ErrorBoundary>
                       )}
                       {activeAnalysisTab === 'risk' && (
