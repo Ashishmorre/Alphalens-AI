@@ -52,10 +52,9 @@ Return ONLY JSON with:
 - bullCase: { title, targetPrice, probability, points[] }
 - bearCase: { title, targetPrice, probability, points[] }
 - baseCase: { title, targetPrice, probability }
-- keyDrivers[], moatRating, moatType, growthQuality, catalysts[], risks[], positionSizing, comparisonPeers[],`,
+- keyDrivers[], moatRating, moatType, growthQuality, catalysts[], risks[], positionSizing, comparisonPeers[]`,
 }
   }
-}
 
 function buildDCFPrompt(ticker, d) {
   const price = d.price?.toFixed?.(2) || 100
