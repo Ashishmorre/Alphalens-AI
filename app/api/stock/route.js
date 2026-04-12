@@ -16,6 +16,7 @@ import {
   checkRequestSafety,
   sanitizeInput,
 } from '@/lib/security'
+import { fetchNSEData, parseIndASXBRL } from '@/lib/nse-xbrl-parser'
 
 const RATE_LIMIT = RATE_LIMIT_PRESETS.stockData
 
@@ -71,6 +72,60 @@ export async function GET(request) {
       quote: rawData.quote,
       summary: rawData.summary,
     })
+
+    // ─── NSE XBRL Fallback for Indian Equities ─────────────────────────────
+    // If Yahoo Finance returns null for debtToEquity or roe on .NS tickers,
+    // attempt to fetch audited data from NSE Corporate Filings
+    if (validation.ticker.endsWith('.NS')) {
+      const needsDebtToEquity = data.debtToEquity === null || data.debtToEquity === undefined
+      const needsROE = data.roe === null || data.roe === undefined
+
+      if ((needsDebtToEquity || needsROE) && data.totalEquity === undefined) {
+        try {
+          // Construct NSE corporate filings URL (example pattern - adjust as needed)
+          const nseSymbol = validation.ticker.replace('.NS', '')
+          const nseUrl = `https://www.nseindia.com/api/company-filings?symbol=${nseSymbol}&filingType=xbrl`
+
+          // Fetch XBRL data with session management
+          const xbrlXml = await fetchNSEData(nseUrl)
+
+          if (xbrlXml) {
+            const xbrlMetrics = parseIndASXBRL(xbrlXml)
+
+            if (!xbrlMetrics.error) {
+              // Patch missing ratios with XBRL-derived values
+              if (needsDebtToEquity && xbrlMetrics.totalDebt !== undefined && xbrlMetrics.totalEquity !== undefined && xbrlMetrics.totalEquity > 0) {
+                data.debtToEquity = xbrlMetrics.totalDebt / xbrlMetrics.totalEquity
+              }
+
+              if (needsROE && xbrlMetrics.netIncome !== undefined && xbrlMetrics.totalEquity !== undefined && xbrlMetrics.totalEquity > 0) {
+                data.roe = xbrlMetrics.netIncome / xbrlMetrics.totalEquity
+              }
+
+              // Fill in other XBRL-derived metrics if missing
+              if (!data.revenue && xbrlMetrics.revenueFromOperations) {
+                data.revenue = xbrlMetrics.revenueFromOperations
+              }
+              if (!data.totalDebt && xbrlMetrics.totalDebt) {
+                data.totalDebt = xbrlMetrics.totalDebt
+              }
+
+              // Mark data as XBRL-enhanced for UI transparency
+              data._xbrlEnhanced = true
+              data._xbrlMetrics = {
+                totalEquity: xbrlMetrics.totalEquity,
+                totalDebt: xbrlMetrics.totalDebt,
+                netIncome: xbrlMetrics.netIncome,
+              }
+            }
+          }
+        } catch (nseError) {
+          // Graceful degradation — don't fail the request if NSE fetch fails
+          console.warn('NSE XBRL fetch failed (graceful degradation):', nseError.message)
+          data._xbrlError = nseError.message
+        }
+      }
+    }
 
     return NextResponse.json(
       { success: true, data, error: null },
