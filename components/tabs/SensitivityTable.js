@@ -3,6 +3,12 @@
 import { formatPrice } from '@/lib/client-utils'
 import { getSensitivityClass } from '@/lib/financial-utils'
 
+function fixSensitivity(data) {
+  if (!data) return null
+  if (!Array.isArray(data.values)) return null
+  return data
+}
+
 function normalizeSensitivity(data) {
   if (!data) return null
   const safe = {
@@ -18,7 +24,11 @@ function normalizeSensitivity(data) {
 }
 
 export default function SensitivityTable({ data, currentPrice, currency }) {
-  const normalizedData = normalizeSensitivity(data)
+  const sensitivity = fixSensitivity(data)
+  if (!sensitivity) {
+    return <div style={{padding: '1rem', color: 'var(--txt-muted)'}}>No sensitivity data available</div>
+  }
+  const normalizedData = normalizeSensitivity(sensitivity)
   // Handle missing or invalid data
   if (!normalizedData || !normalizedData.waccRange || !normalizedData.tgrRange || !normalizedData.values) {
     return (

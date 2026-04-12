@@ -477,6 +477,7 @@ export async function POST(request) {
     try {
       analysisData = safeParseJSON(rawResponse)
     } catch (parseError) {
+      console.error("RAW AI:", rawResponse)
       // Try to extract JSON from markdown or text-wrapped response
       const jsonMatch = rawResponse.match(/\{[\s\S]*\}/)
       if (jsonMatch) {

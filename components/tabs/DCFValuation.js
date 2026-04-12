@@ -1,4 +1,5 @@
 'use client'
+import { useEffect } from 'react'
 import { formatNumber, formatPrice } from '@/lib/client-utils'
 import { calculateUpside, getValuationVerdict, calculateDCFRating } from '@/lib/financial-utils'
 import { useDCF } from '@/contexts/DCFContext'
@@ -8,6 +9,11 @@ import SensitivityTable from './SensitivityTable'
 export default function DCFValuation({ currency }) {
   const { safeData: d } = useDCF()
   if (!d) return null
+
+  // Debug logging
+  useEffect(() => {
+    console.log("DCF DATA:", d)
+  }, [d])
 
   // Use the strictly derived verdict from our corrected math engine
   const verdict = getValuationVerdict(d.currentPrice, d.intrinsicValuePerShare)
