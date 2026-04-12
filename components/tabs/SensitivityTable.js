@@ -3,9 +3,24 @@
 import { formatPrice } from '@/lib/client-utils'
 import { getSensitivityClass } from '@/lib/financial-utils'
 
+function normalizeSensitivity(data) {
+  if (!data) return null
+  const safe = {
+    waccRange: data.waccRange || [],
+    tgrRange: data.tgrRange || [],
+    values: data.values || []
+  }
+  // FIX MATRIX SHAPE
+  if (safe.tgrRange.length !== safe.values.length) {
+    safe.values = safe.tgrRange.map(() => safe.waccRange.map(() => null))
+  }
+  return safe
+}
+
 export default function SensitivityTable({ data, currentPrice, currency }) {
+  const normalizedData = normalizeSensitivity(data)
   // Handle missing or invalid data
-  if (!data || !data.waccRange || !data.tgrRange || !data.values) {
+  if (!normalizedData || !normalizedData.waccRange || !normalizedData.tgrRange || !normalizedData.values) {
     return (
       <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
         <SectionTitle>Sensitivity Analysis</SectionTitle>
@@ -27,7 +42,7 @@ export default function SensitivityTable({ data, currentPrice, currency }) {
     )
   }
 
-  const { waccRange, tgrRange, values } = data
+  const { waccRange, tgrRange, values } = normalizedData
 
   // Validate data integrity
   if (tgrRange.length !== values.length) {

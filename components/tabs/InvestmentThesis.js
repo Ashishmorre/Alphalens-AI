@@ -33,12 +33,11 @@ export default function InvestmentThesis({ data, ticker, currency }) {
   const errors = d.validationErrors || validation.errors
 
   // Return insufficient data state if validation fails
-  if (!isDataValid || errors.length > 0) {
-    return <InsufficientDataState
-      reason="Analysis quality below acceptable threshold"
-      errors={errors}
-      ticker={ticker}
-    />
+  const allowRender = d && (
+    d.verdict || d.targetPrice || (d.keyDrivers?.length > 0)
+  )
+  if (!allowRender) {
+    return <InsufficientDataState />
   }
 
   // Validate and filter peers by sector
