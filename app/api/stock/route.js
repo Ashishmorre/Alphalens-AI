@@ -18,6 +18,7 @@ import {
 } from '@/lib/security'
 import { fetchNSEData, parseIndASXBRL } from '@/lib/nse-xbrl-parser'
 import { calculateRatiosFromXBRL } from '@/lib/financial-utils'
+import { fetchScreenerData, mergeScreenerData, isScreenerEligible } from '@/lib/screener-scraper'
 
 const RATE_LIMIT = RATE_LIMIT_PRESETS.stockData
 
