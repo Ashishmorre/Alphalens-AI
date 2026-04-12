@@ -175,4 +175,4 @@ AlphaLens AI is for informational and educational purposes only. It does not con
 
 ---
 
-*Built by Ashish · EY GDS Intern · CFA Level I Candidate · BCom BMCC Pune*
+*Built by Ashish & Aman · CFA Candidate · BCom Hons*
