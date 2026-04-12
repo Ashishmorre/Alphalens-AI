@@ -234,7 +234,7 @@ export default function Home() {
         <p style={{ fontSize: '0.72rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', lineHeight: 1.6 }}>
           AlphaLens AI · Powered by Claude &amp; Yahoo Finance · For informational purposes only — not investment advice.
           <br />
-          Built by <span style={{ color: 'var(--teal)' }}>Ashish & Aman</span> · CFA Candidate · BCom Hons
+          Built by <span style={{ color: 'var(--teal)' }}>Ashish & Aman Agrahari</span> · CFA Candidate · BCom Hons
         </p>
       </footer>
 
