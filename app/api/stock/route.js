@@ -17,6 +17,7 @@ import {
   sanitizeInput,
 } from '@/lib/security'
 import { fetchNSEData, parseIndASXBRL } from '@/lib/nse-xbrl-parser'
+import { calculateRatiosFromXBRL } from '@/lib/financial-utils'
 
 const RATE_LIMIT = RATE_LIMIT_PRESETS.stockData
 
@@ -74,16 +75,20 @@ export async function GET(request) {
     })
 
     // ─── NSE XBRL Fallback for Indian Equities ─────────────────────────────
-    // If Yahoo Finance returns null for debtToEquity or roe on .NS tickers,
-    // attempt to fetch audited data from NSE Corporate Filings
-    if (validation.ticker.endsWith('.NS')) {
-      const needsDebtToEquity = data.debtToEquity === null || data.debtToEquity === undefined
-      const needsROE = data.roe === null || data.roe === undefined
+    // If Yahoo Finance returns null for key ratios on .NS/.BO tickers,
+    // fetch audited data from NSE Corporate Filings and calculate ratios
+    const isIndianTicker = validation.ticker.endsWith('.NS') || validation.ticker.endsWith('.BO')
 
-      if ((needsDebtToEquity || needsROE) && data.totalEquity === undefined) {
+    if (isIndianTicker) {
+      const needsDebtToEquity = data.debtToEquity === null || data.debtToEquity === undefined || data.debtToEquity === 0
+      const needsROE = data.roe === null || data.roe === undefined || data.roe === 0
+      const needsCurrentRatio = data.currentRatio === null || data.currentRatio === undefined || data.currentRatio === 0
+      const needsPriceToBook = data.priceToBook === null || data.priceToBook === undefined || data.priceToBook === 0
+
+      if (needsDebtToEquity || needsROE || needsCurrentRatio || needsPriceToBook) {
         try {
-          // Construct NSE corporate filings URL (example pattern - adjust as needed)
-          const nseSymbol = validation.ticker.replace('.NS', '')
+          // Construct NSE corporate filings URL
+          const nseSymbol = validation.ticker.replace('.NS', '').replace('.BO', '')
           const nseUrl = `https://www.nseindia.com/api/company-filings?symbol=${nseSymbol}&filingType=xbrl`
 
           // Fetch XBRL data with session management
@@ -93,30 +98,54 @@ export async function GET(request) {
             const xbrlMetrics = parseIndASXBRL(xbrlXml)
 
             if (!xbrlMetrics.error) {
+              // Calculate ratios from XBRL using professional-grade math
+              const marketData = {
+                currentPrice: data.price || 0,
+                sharesOutstanding: data.sharesOutstanding || 0,
+                marketCap: data.marketCap || 0,
+              }
+
+              const calculatedRatios = calculateRatiosFromXBRL(xbrlMetrics, marketData)
+
               // Patch missing ratios with XBRL-derived values
-              if (needsDebtToEquity && xbrlMetrics.totalDebt !== undefined && xbrlMetrics.totalEquity !== undefined && xbrlMetrics.totalEquity > 0) {
-                data.debtToEquity = xbrlMetrics.totalDebt / xbrlMetrics.totalEquity
+              if (needsDebtToEquity && calculatedRatios.debtToEquity !== null) {
+                data.debtToEquity = calculatedRatios.debtToEquity
+              }
+              if (needsROE && calculatedRatios.roe !== null) {
+                data.roe = calculatedRatios.roe / 100 // Convert from percentage to decimal
+              }
+              if (needsCurrentRatio && calculatedRatios.currentRatio !== null) {
+                data.currentRatio = calculatedRatios.currentRatio
+              }
+              if (needsPriceToBook && calculatedRatios.priceToBook !== null) {
+                data.priceToBook = calculatedRatios.priceToBook
+              }
+              if (!data.bookValuePerShare && calculatedRatios.bookValuePerShare !== null) {
+                data.bookValuePerShare = calculatedRatios.bookValuePerShare
               }
 
-              if (needsROE && xbrlMetrics.netIncome !== undefined && xbrlMetrics.totalEquity !== undefined && xbrlMetrics.totalEquity > 0) {
-                data.roe = xbrlMetrics.netIncome / xbrlMetrics.totalEquity
-              }
-
-              // Fill in other XBRL-derived metrics if missing
+              // Fill in raw XBRL-derived metrics if missing
               if (!data.revenue && xbrlMetrics.revenueFromOperations) {
                 data.revenue = xbrlMetrics.revenueFromOperations
               }
               if (!data.totalDebt && xbrlMetrics.totalDebt) {
                 data.totalDebt = xbrlMetrics.totalDebt
               }
+              if (!data.totalEquity && xbrlMetrics.totalEquity) {
+                data.totalEquity = xbrlMetrics.totalEquity
+              }
 
-              // Mark data as XBRL-enhanced for UI transparency
+              // Mark data as XBRL-enhanced for UI transparency and AI context
               data._xbrlEnhanced = true
               data._xbrlMetrics = {
                 totalEquity: xbrlMetrics.totalEquity,
                 totalDebt: xbrlMetrics.totalDebt,
                 netIncome: xbrlMetrics.netIncome,
+                currentAssets: xbrlMetrics.currentAssets,
+                currentLiabilities: xbrlMetrics.currentLiabilities,
+                bookValuePerShare: calculatedRatios.bookValuePerShare,
               }
+              data._xbrlRatios = calculatedRatios
             }
           }
         } catch (nseError) {
