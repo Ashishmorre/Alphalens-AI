@@ -91,128 +91,130 @@ ABSOLUTE REQUIREMENT: ALL NUMBERS MUST BE MATHEMATICALLY CONSISTENT AND LOGICALL
 
 function buildDCFPrompt(ticker, d) {
   const price = d.price?.toFixed?.(2) || 100
-  const intrinsicValue = d.intrinsicValuePerShare?.toFixed?.(2) || 0
-  const upside = d.upside?.toFixed?.(1) || 0
-  const dcfRating = d.dcfRating || 'NEUTRAL'
-
   return {
-    system: 'You are a Senior Financial Analyst. Return ONLY valid JSON. NEVER use markdown backticks.',
-    user: `Provide DCF analysis commentary and risk assessment for ${ticker}.
+    system: 'You are a Quantitative Financial Modeler. You MUST return ONLY a valid JSON object. Your internal math calculations must be flawless.',
+    user: `Build a 5-year DCF model for ${ticker}.
 
-INJECTED CALCULATIONS (these are mathematically complete - use them for context):
-- Current Price: ${price}
-- Intrinsic Value: ${intrinsicValue}
-- Upside: ${upside}%
-- DCF Rating: ${dcfRating}
-- WACC: ${d.assumptions?.wacc || 10}%
-- Terminal Growth: ${d.assumptions?.terminalGrowthRate || 2.5}%
+CURRENT INPUT DATA (do not deviate from these base numbers):
+- Price: ${price} ${d.currency || 'USD'}
+- Revenue: ${fmtNumber(d.revenue)}
+- EBITDA: ${fmtNumber(d.ebitda)}
+- Gross Margin: ${fmtPercent(d.grossMargin)}
+- Operating Margin: ${fmtPercent(d.operatingMargin)}
+- Total Debt: ${fmtNumber(d.totalDebt)}
+- Cash: ${fmtNumber(d.totalCash)}
+- Shares Outstanding: ${d.sharesOutstanding || 'estimate based on market cap'}
 
-CRITICAL RULES:
-1. The math is ALREADY DONE in JavaScript. DO NOT recalculate. Focus on qualitative analysis.
-2. REPLACE all '0' and empty strings with HIGHLY SPECIFIC, sector-relevant content.
-3. keyRisksToModel MUST contain exactly 3 sector-specific risks (e.g., "Coal price volatility compressing margins"). Generic risks like "market risk" are FORBIDDEN.
-4. analystNote MUST explain WHY intrinsic value differs from market price in exactly 3 sentences.
+CRITICAL MATH RULES - ANY VIOLATION RENDERS OUTPUT USELESS:
+1. All projections MUST scale logically from the CURRENT DATA provided above.
+2. DO NOT jump magnitudes arbitrarily (e.g., if Revenue is in Billions, projections stay in Billions).
+3. intrinsicValuePerShare MUST logically correlate with enterpriseValue and outstanding shares.
+   Formula: equityValue = enterpriseValue + cash - debt; intrinsicValuePerShare = equityValue / sharesOutstanding
+4. marginOfSafety MUST be calculated as: ((intrinsicValuePerShare - ${price}) / intrinsicValuePerShare) * 100
+5. upside MUST be calculated as: ((intrinsicValuePerShare - ${price}) / ${price}) * 100
+6. dcfRating MUST be UNDERVALUED if intrinsic > current, OVERVALUED if intrinsic < current, NEUTRAL if within 10%
+7. If intrinsicValuePerShare = 125.50 and current = 399.35, then:
+   - upside = -68.5% (negative, because 125 < 399)
+   - dcfRating = OVERVALUED (red)
+   - This is NOT Undervalued with +22.6% upside - that is mathematically impossible
 
-Return ONLY JSON matching this exact structure:
+Return a SINGLE VALID JSON OBJECT with this exact structure (numbers only):
 {
   "assumptions": {
-    "wacc": ${d.assumptions?.wacc || 0},
-    "terminalGrowthRate": ${d.assumptions?.terminalGrowthRate || 0},
-    "taxRate": ${d.assumptions?.taxRate || 0}
+    "wacc": 10.0,
+    "terminalGrowthRate": 2.5,
+    "taxRate": 21.0,
+    "revenueGrowthRates": [10.0, 9.5, 9.0, 8.5, 8.0],
+    "ebitdaMargins": [20.0, 21.0, 22.0, 23.0, 24.0]
   },
   "projections": [
-    {"year": 1, "revenue": 0, "ebitda": 0, "fcf": 0}
+    {"year": 1, "revenue": 1000000000, "ebitda": 200000000, "ebit": 150000000, "nopat": 118500000, "capex": -50000000, "nwcChange": -10000000, "fcf": 58500000}
   ],
-  "intrinsicValuePerShare": ${intrinsicValue},
-  "marginOfSafety": ${d.marginOfSafety || 0},
-  "upside": ${upside},
-  "dcfRating": "${dcfRating}",
-  "keyRisksToModel": [
-    "Provide 3 highly specific, sector-relevant risks to this DCF model (e.g., Margin compression due to coal prices for utilities)."
-  ],
-  "analystNote": "Write a 3-sentence institutional analyst commentary explaining why the intrinsic value deviates from the current market price based on the fundamental cash flows."
-}`
+  "pvFCFs": 280000000,
+  "terminalValue": 1500000000,
+  "pvTerminalValue": 950000000,
+  "enterpriseValue": 1230000000,
+  "equityValue": 1000000000,
+  "intrinsicValuePerShare": 125.50,
+  "marginOfSafety": 15.0,
+  "upside": -68.5,
+  "dcfRating": "OVERVALUED",
+  "sensitivityTable": {
+    "waccRange": [8.0, 9.0, 10.0, 11.0, 12.0],
+    "tgrRange": [1.5, 2.0, 2.5, 3.0, 3.5],
+    "values": [[150, 140, 130], [145, 135, 125]]
+  },
+  "keyRisksToModel": ["Risk 1", "Risk 2"],
+  "analystNote": "Brief DCF methodology note"
+}
+
+REQUIREMENTS:
+1. Return ONLY the JSON object, no markdown backticks
+2. Use realistic numbers based on ${ticker}'s financials
+3. All numeric values must be plain numbers (not strings)
+4. WACC in percentage points (e.g., 10.0 for 10%)
+5. 5 projection years exactly
+6. CRITICAL: Ensure ALL calculations are mathematically consistent
+7. NO HALLUCINATIONS: If you cannot determine a value, use null or 0, never invent`,
   }
 }
 
 function buildRiskPrompt(ticker, d) {
-  const price = d.price?.toFixed?.(2) || 'N/A'
-  const pe = d.pe?.toFixed?.(2) || '—'
-  const fwdPe = d.forwardPE?.toFixed?.(2) || '—'
-  const evEbitda = d.evToEbitda?.toFixed?.(2) || '—'
-  const debtEq = d.debtToEquity?.toFixed?.(2) || '—'
-  const roe = d.roe ? (d.roe * 100).toFixed(2) + '%' : '—'
-  const currentRatio = d.currentRatio?.toFixed?.(2) || '—'
-
-  // Technicals injection
-  const ma50 = d.fiftyDayAverage?.toFixed?.(2) || 'calculated'
-  const ma200 = d.twoHundredDayAverage?.toFixed?.(2) || 'calculated'
-  const weekHigh52 = d.weekHigh52?.toFixed?.(2) || 'N/A'
-  const weekLow52 = d.weekLow52?.toFixed?.(2) || 'N/A'
-  const rsi = d.rsi || 'approximate'
-  const volumeSignal = d.avgVolume && d.volume
-    ? (d.volume > d.avgVolume * 1.2 ? 'Above Average' : d.volume < d.avgVolume * 0.8 ? 'Below Average' : 'Normal')
-    : 'N/A'
+  const price = d.price?.toFixed?.(2) || 'N/A';
+  const pe = d.pe?.toFixed?.(2) || '—';
+  const fwdPe = d.forwardPE?.toFixed?.(2) || '—';
+  const evEbitda = d.evToEbitda?.toFixed?.(2) || '—';
+  const debtEq = d.debtToEquity?.toFixed?.(2) || '—';
+  const roe = d.roe ? (d.roe * 100).toFixed(2) + '%' : '—';
 
   return {
     system: 'You are a Quantitative Risk Analyst. Return ONLY valid JSON. NEVER use markdown backticks.',
     user: `Analyze risk metrics and financial health for ${ticker}.
 
-INJECTED CALCULATIONS (use these, do not invent):
+CURRENT DATA:
 - Current Price: ${price}
 - P/E (TTM): ${pe}
 - Forward P/E: ${fwdPe}
 - EV/EBITDA: ${evEbitda}
 - Debt to Equity: ${debtEq}
 - ROE: ${roe}
-- Current Ratio: ${currentRatio}
-- 50-Day MA: ${ma50}
-- 200-Day MA: ${ma200}
-- 52W High: ${weekHigh52}
-- 52W Low: ${weekLow52}
-- Volume Signal: ${volumeSignal}
 - Beta: ${d.beta?.toFixed?.(2) || '—'}
 
 CRITICAL RULES:
-1. USE the injected calculation values. DO NOT invent new numbers.
-2. REPLACE all '0' and empty strings with HIGHLY ACCURATE analysis.
-3. technicals.support should use 50-Day MA or 52W Low as fallback.
-4. technicals.resistance should use 200-Day MA or 52W High as fallback.
-5. riskFactors MUST include Liquidity Risk (based on Current Ratio), Leverage Risk (based on Debt/Equity), and Valuation Risk (based on P/E vs sector).
-6. overallRiskScore & overallQualityScore MUST be integers 1-10.
+1. For valuationRatios, qualityRatios, and leverageRatios, you MUST use the exact 'CURRENT DATA' values provided above. Do not invent them.
+2. REPLACE all '0' and empty string '""' values in the JSON template below with your own highly accurate analysis. DO NOT output 0 unless it is the actual calculated value.
+3. overallRiskScore & overallQualityScore MUST be between 1 and 10.
+4. Provide realistic sector averages for the benchmarks.
 
 Return ONLY JSON matching this exact structure:
 {
-  "overallRiskScore": 0,
-  "overallQualityScore": 0,
-  "riskSummary": "Provide a 2-sentence institutional summary of the risk profile.",
-  "technicals": {
-    "trend": "BULLISH|BEARISH|NEUTRAL",
-    "rsi": ${rsi === 'approximate' ? 50 : rsi},
-    "support": ${ma50 !== 'calculated' ? ma50 : (weekLow52 !== 'N/A' ? weekLow52 : 0)},
-    "resistance": ${ma200 !== 'calculated' ? ma200 : (weekHigh52 !== 'N/A' ? weekHigh52 : 0)},
-    "volumeSignal": "${volumeSignal}"
-  },
   "valuationRatios": [
-    {"name": "P/E", "value": "${pe}x", "benchmark": "0.0x"}
+    {"name": "P/E Ratio", "value": "${pe}", "benchmark": "0.0x"}
   ],
   "qualityRatios": [
-    {"name": "ROE", "value": "${roe}", "benchmark": "0.0%"},
-    {"name": "Current Ratio", "value": "${currentRatio}x", "benchmark": "0.0x"}
+    {"name": "ROE", "value": "${roe}", "benchmark": "0.0%"}
   ],
   "leverageRatios": [
-    {"name": "D/E", "value": "${debtEq}x", "benchmark": "0.0x"}
+    {"name": "Debt/Equity", "value": "${debtEq}", "benchmark": "0.0x"}
   ],
+  "technicals": {
+    "trend": "NEUTRAL",
+    "rsi": 0,
+    "support": 0,
+    "resistance": 0,
+    "volumeSignal": ""
+  },
   "riskFactors": [
-    {"factor": "Liquidity Risk", "severity": "High|Medium|Low", "description": "Analyze based on Current Ratio of ${currentRatio}."},
-    {"factor": "Leverage Risk", "severity": "High|Medium|Low", "description": "Analyze based on D/E of ${debtEq}."},
-    {"factor": "Valuation Risk", "severity": "High|Medium|Low", "description": "Analyze based on P/E of ${pe} vs sector."}
+    {"factor": "", "severity": "Medium", "description": ""}
   ],
+  "overallRiskScore": 0,
+  "overallQualityScore": 0,
+  "riskSummary": "",
   "peerBenchmarks": [
-    {"ticker": "PEER1", "metric": "P/E", "value": "0.0x"}
+    {"ticker": "PEER.NS", "metric": "P/E", "value": "0.0x"}
   ]
 }`
-  }
+  };
 }
 
 function buildNewsPrompt(ticker, d) {
