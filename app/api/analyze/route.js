@@ -166,6 +166,15 @@ function buildRiskPrompt(ticker, d) {
   const evEbitda = d.evToEbitda?.toFixed?.(2) || '—';
   const debtEq = d.debtToEquity?.toFixed?.(2) || '—';
   const roe = d.roe ? (d.roe * 100).toFixed(2) + '%' : '—';
+  const currentRatio = d.currentRatio?.toFixed?.(2) || '—';
+
+  // Technical indicators injection
+  const ma50 = d.fiftyDayAverage?.toFixed?.(2) || '—';
+  const ma200 = d.twoHundredDayAverage?.toFixed?.(2) || '—';
+  const weekHigh52 = d.weekHigh52?.toFixed?.(2) || '—';
+  const weekLow52 = d.weekLow52?.toFixed?.(2) || '—';
+  const avgVolume = d.avgVolume ? fmtNumber(d.avgVolume) : '—';
+  const volume = d.volume ? fmtNumber(d.volume) : '—';
 
   return {
     system: 'You are a Quantitative Risk Analyst. Return ONLY valid JSON. NEVER use markdown backticks.',
@@ -178,40 +187,54 @@ CURRENT DATA:
 - EV/EBITDA: ${evEbitda}
 - Debt to Equity: ${debtEq}
 - ROE: ${roe}
+- Current Ratio: ${currentRatio}
 - Beta: ${d.beta?.toFixed?.(2) || '—'}
+
+TECHNICAL INDICATORS:
+- 50-Day MA: ${ma50}
+- 200-Day MA: ${ma200}
+- 52-Week High: ${weekHigh52}
+- 52-Week Low: ${weekLow52}
+- Volume: ${volume}
+- Avg Volume (3M): ${avgVolume}
 
 CRITICAL RULES:
 1. For valuationRatios, qualityRatios, and leverageRatios, you MUST use the exact 'CURRENT DATA' values provided above. Do not invent them.
-2. REPLACE all '0' and empty string '""' values in the JSON template below with your own highly accurate analysis. DO NOT output 0 unless it is the actual calculated value.
-3. overallRiskScore & overallQualityScore MUST be between 1 and 10.
-4. Provide realistic sector averages for the benchmarks.
+2. For technicals, USE the injected indicator values (50DMA, 200DMA, 52W High/Low). support should use 50DMA or 52W Low, resistance should use 200DMA or 52W High.
+3. Risk Factors MUST include: Liquidity Risk (based on Current Ratio), Leverage Risk (based on Debt/Equity), and Valuation Risk (based on P/E).
+4. REPLACE all '0', '—', and empty string '""' values in the JSON template below with your own highly accurate analysis. DO NOT output 0 unless it is the actual calculated value.
+5. overallRiskScore & overallQualityScore MUST be between 1 and 10.
+6. Provide realistic sector averages for the benchmarks.
 
 Return ONLY JSON matching this exact structure:
 {
   "valuationRatios": [
-    {"name": "P/E Ratio", "value": "${pe}", "benchmark": "0.0x"}
+    {"name": "P/E", "value": "${pe}x", "benchmark": "0.0x"}
   ],
   "qualityRatios": [
-    {"name": "ROE", "value": "${roe}", "benchmark": "0.0%"}
+    {"name": "ROE", "value": "${roe}", "benchmark": "0.0%"},
+    {"name": "Current Ratio", "value": "${currentRatio}x", "benchmark": "0.0x"}
   ],
   "leverageRatios": [
-    {"name": "Debt/Equity", "value": "${debtEq}", "benchmark": "0.0x"}
+    {"name": "D/E", "value": "${debtEq}x", "benchmark": "0.0x"}
   ],
   "technicals": {
-    "trend": "NEUTRAL",
+    "trend": "BULLISH|BEARISH|NEUTRAL",
     "rsi": 0,
     "support": 0,
     "resistance": 0,
     "volumeSignal": ""
   },
   "riskFactors": [
-    {"factor": "", "severity": "Medium", "description": ""}
+    {"factor": "Liquidity Risk", "severity": "High|Medium|Low", "description": "Analyze based on Current Ratio."},
+    {"factor": "Leverage Risk", "severity": "High|Medium|Low", "description": "Analyze based on Debt/Equity."},
+    {"factor": "Valuation Risk", "severity": "High|Medium|Low", "description": "Analyze based on P/E vs sector."}
   ],
   "overallRiskScore": 0,
   "overallQualityScore": 0,
   "riskSummary": "",
   "peerBenchmarks": [
-    {"ticker": "PEER.NS", "metric": "P/E", "value": "0.0x"}
+    {"ticker": "PEER1", "metric": "P/E", "value": "0.0x"}
   ]
 }`
   };
