@@ -161,51 +161,57 @@ REQUIREMENTS:
 
 function buildRiskPrompt(ticker, d) {
   const price = d.price?.toFixed?.(2) || 'N/A';
+  const pe = d.pe?.toFixed?.(2) || '—';
+  const fwdPe = d.forwardPE?.toFixed?.(2) || '—';
+  const evEbitda = d.evToEbitda?.toFixed?.(2) || '—';
+  const debtEq = d.debtToEquity?.toFixed?.(2) || '—';
+  const roe = d.roe ? (d.roe * 100).toFixed(2) + '%' : '—';
+
   return {
-    system: 'You are a Quantitative Risk Analyst. You MUST return ONLY a valid JSON object. Your mathematical analysis of risk ratios must be flawless. NEVER use markdown backticks.',
+    system: 'You are a Quantitative Risk Analyst. Return ONLY valid JSON. NEVER use markdown backticks.',
     user: `Analyze risk metrics and financial health for ${ticker}.
 
 CURRENT DATA:
-- Current Price: ${price} ${d.currency || 'USD'}
-- P/E (TTM): ${d.pe?.toFixed?.(2) || 'N/A'}
-- Forward P/E: ${d.forwardPE?.toFixed?.(2) || 'N/A'}
-- EV/EBITDA: ${d.evToEbitda?.toFixed?.(2) || 'N/A'}
-- Debt to Equity: ${d.debtToEquity?.toFixed?.(2) || 'N/A'}
-- ROE: ${d.roe ? (d.roe * 100).toFixed(2) + '%' : 'N/A'}
-- Beta: ${d.beta?.toFixed?.(2) || 'N/A'}
+- Current Price: ${price}
+- P/E (TTM): ${pe}
+- Forward P/E: ${fwdPe}
+- EV/EBITDA: ${evEbitda}
+- Debt to Equity: ${debtEq}
+- ROE: ${roe}
+- Beta: ${d.beta?.toFixed?.(2) || '—'}
 
 CRITICAL RULES:
-1. DO NOT invent data. If a ratio cannot be derived from the CURRENT DATA, output "—" for the value.
-2. overallRiskScore MUST be an integer between 1 and 10 (1 = Safest, 10 = Most Risky).
-3. overallQualityScore MUST be an integer between 1 and 10 (1 = Lowest Quality, 10 = Highest Quality).
-4. Do not output nested objects where arrays are expected.
+1. For valuationRatios, qualityRatios, and leverageRatios, you MUST use the exact values provided in the CURRENT DATA above. Do not invent them.
+2. For benchmarks, provide a realistic sector average.
+3. overallRiskScore MUST be an integer between 1 and 10 (1 = Safest, 10 = Most Risky).
+4. overallQualityScore MUST be an integer between 1 and 10 (1 = Lowest Quality, 10 = Highest Quality).
 
-Return ONLY JSON matching this exact structure:
+Return ONLY JSON matching this exact structure (replace <placeholders> with your analysis):
 {
   "valuationRatios": [
-    {"name": "P/E Ratio", "value": "24.6x", "benchmark": "20.0x"}
+    {"name": "P/E Ratio", "value": "${pe}", "benchmark": "<sector_avg_pe>"}
   ],
   "qualityRatios": [
-    {"name": "ROE", "value": "15.4%", "benchmark": "12.0%"}
+    {"name": "ROE", "value": "${roe}", "benchmark": "<sector_avg_roe>"}
   ],
   "leverageRatios": [
-    {"name": "Debt/Equity", "value": "1.5x", "benchmark": "1.0x"}
+    {"name": "Debt/Equity", "value": "${debtEq}", "benchmark": "<sector_avg_debt_eq>"}
   ],
   "technicals": {
-    "trend": "BULLISH|BEARISH|NEUTRAL",
-    "rsi": 55,
-    "support": 380.00,
-    "resistance": 420.00,
-    "volumeSignal": "Above Average"
+    "trend": "<BULLISH|BEARISH|NEUTRAL>",
+    "rsi": <integer_between_0_and_100>,
+    "support": <realistic_price_number>,
+    "resistance": <realistic_price_number>,
+    "volumeSignal": "<string_description>"
   },
   "riskFactors": [
-    {"factor": "...", "severity": "High|Medium|Low", "description": "..."}
+    {"factor": "<specific_risk_name>", "severity": "<High|Medium|Low>", "description": "<brief_detail>"}
   ],
-  "overallRiskScore": 4,
-  "overallQualityScore": 8,
-  "riskSummary": "A 2-sentence summary of the company's financial risk profile.",
+  "overallRiskScore": <integer_1_to_10>,
+  "overallQualityScore": <integer_1_to_10>,
+  "riskSummary": "<2_sentence_summary>",
   "peerBenchmarks": [
-    {"ticker": "PEER1", "metric": "P/E", "value": "22.0x"}
+    {"ticker": "<REAL_PEER_TICKER>", "metric": "P/E", "value": "<estimated_peer_pe>"}
   ]
 }`
   };
@@ -214,8 +220,17 @@ Return ONLY JSON matching this exact structure:
 function buildNewsPrompt(ticker, d) {
   const price = d.price?.toFixed?.(2) || 'N/A';
   const target = d.targetMeanPrice?.toFixed?.(2) || 'N/A';
+  const rec = d.recommendationKey ? d.recommendationKey.toUpperCase() : 'HOLD';
+
+  // Calculate real upside mathematically
+  let realUpside = 0;
+  if (d.targetMeanPrice && d.price && d.price > 0) {
+    realUpside = ((d.targetMeanPrice - d.price) / d.price) * 100;
+  }
+  const upsideStr = realUpside !== 0 ? realUpside.toFixed(2) : '0.00';
+
   return {
-    system: 'You are a Senior Market Sentiment Analyst. You MUST return ONLY a valid JSON object. NEVER use markdown backticks.',
+    system: 'You are a Senior Market Sentiment Analyst. Return ONLY valid JSON. NEVER use markdown backticks.',
     user: `Analyze the market sentiment and news narrative for ${ticker}.
 
 COMPANY CONTEXT:
@@ -223,48 +238,49 @@ COMPANY CONTEXT:
 - Industry: ${d.industry || 'N/A'}
 - Current Price: ${price}
 - Analyst Mean Target: ${target}
+- Recommendation: ${rec}
 
 CRITICAL RULES:
-1. sentimentScore MUST be an integer between 0 and 100 (0 = Extremely Bearish, 50 = Neutral, 100 = Extremely Bullish).
-2. sentimentLabel MUST logically match the score (e.g., >60 is Positive/Bullish, <40 is Negative/Bearish).
-3. If Analyst Mean Target is known, the upside in analystConsensus MUST be calculated as ((Target - Current) / Current) * 100.
-4. All arrays must contain at least one highly realistic, sector-specific item.
+1. sentimentScore MUST be an integer between 0 and 100 (0=Bearish, 50=Neutral, 100=Bullish).
+2. sentimentLabel MUST logically match the score.
+3. The analystConsensus object MUST use the dynamically injected target and upside values provided in the schema below. DO NOT change them.
+4. Provide realistic values for analyst buy/hold/sell counts based on typical coverage for a company of this size.
 
-Return ONLY JSON matching this exact structure:
+Return ONLY JSON matching this exact structure (replace <placeholders> with your analysis):
 {
-  "sentimentScore": 65,
-  "sentimentLabel": "Positive",
-  "sentimentRationale": "A 2-sentence explanation of current market sentiment.",
+  "sentimentScore": <integer_0_to_100>,
+  "sentimentLabel": "<Positive|Neutral|Negative>",
+  "sentimentRationale": "<2_sentence_explanation>",
   "analystConsensus": {
-    "rating": "BUY|HOLD|SELL",
-    "meanTarget": 450.00,
-    "upside": 12.5,
-    "buyCount": 15,
-    "holdCount": 4,
-    "sellCount": 1,
-    "noteOnConsensus": "..."
+    "rating": "${rec.includes('BUY') ? 'BUY' : rec.includes('SELL') ? 'SELL' : 'HOLD'}",
+    "meanTarget": ${target !== 'N/A' ? target : 'null'},
+    "upside": ${upsideStr},
+    "buyCount": <realistic_integer>,
+    "holdCount": <realistic_integer>,
+    "sellCount": <realistic_integer>,
+    "noteOnConsensus": "<brief_note>"
   },
   "keyThemes": [
-    {"theme": "...", "sentiment": "POSITIVE|NEGATIVE|NEUTRAL", "timeframe": "Short-term", "detail": "..."}
+    {"theme": "<theme_name>", "sentiment": "<POSITIVE|NEGATIVE|NEUTRAL>", "timeframe": "<Short-term|Long-term>", "detail": "<brief_detail>"}
   ],
   "bullCatalysts": [
-    {"catalyst": "...", "probability": "High|Medium|Low", "potentialImpact": "..."}
+    {"catalyst": "<catalyst_name>", "probability": "<High|Medium|Low>", "potentialImpact": "<brief_detail>"}
   ],
   "bearCatalysts": [
-    {"catalyst": "...", "probability": "High|Medium|Low", "potentialImpact": "..."}
+    {"catalyst": "<catalyst_name>", "probability": "<High|Medium|Low>", "potentialImpact": "<brief_detail>"}
   ],
   "macroExposure": [
-    {"factor": "Interest Rates", "exposure": "NEGATIVE|POSITIVE|NEUTRAL", "detail": "..."}
+    {"factor": "<factor_name>", "exposure": "<POSITIVE|NEGATIVE|NEUTRAL>", "detail": "<brief_detail>"}
   ],
   "institutionalActivity": {
-    "shortInterestTrend": "Decreasing|Stable|Increasing",
-    "shortSqueezeRisk": "Low|Medium|High",
-    "institutionalOwnershipNote": "..."
+    "shortInterestTrend": "<Decreasing|Stable|Increasing>",
+    "shortSqueezeRisk": "<Low|Medium|High>",
+    "institutionalOwnershipNote": "<brief_note>"
   },
   "upcomingEvents": [
-    {"event": "Earnings Call", "expectedDate": "Next Quarter", "marketImplications": "..."}
+    {"event": "<event_name>", "expectedDate": "<e.g., Next Quarter>", "marketImplications": "<brief_detail>"}
   ],
-  "tradingNote": "A brief 30-60 day tactical trading outlook."
+  "tradingNote": "<30_to_60_day_outlook>"
 }`
   };
 }
