@@ -160,28 +160,113 @@ REQUIREMENTS:
 }
 
 function buildRiskPrompt(ticker, d) {
+  const price = d.price?.toFixed?.(2) || 'N/A';
   return {
-    system: 'You are a quantitative risk analyst. Return ONLY valid JSON with no markdown.',
-    user: `Analyze risk and ratios for ${ticker}.
+    system: 'You are a Quantitative Risk Analyst. You MUST return ONLY a valid JSON object. Your mathematical analysis of risk ratios must be flawless. NEVER use markdown backticks.',
+    user: `Analyze risk metrics and financial health for ${ticker}.
 
-Valuation: P/E ${d.pe?.toFixed?.(1) || 'N/A'}, EV/EBITDA ${d.evToEbitda?.toFixed?.(1) || 'N/A'}
-Quality: ROE ${fmtPercent(d.roe)}, ROA ${fmtPercent(d.roa)}, Margins ${fmtPercent(d.profitMargin)}
-Leverage: D/E ${d.debtToEquity?.toFixed?.(2) || 'N/A'}, Current ${d.currentRatio?.toFixed?.(2) || 'N/A'}
+CURRENT DATA:
+- Current Price: ${price} ${d.currency || 'USD'}
+- P/E (TTM): ${d.pe?.toFixed?.(2) || 'N/A'}
+- Forward P/E: ${d.forwardPE?.toFixed?.(2) || 'N/A'}
+- EV/EBITDA: ${d.evToEbitda?.toFixed?.(2) || 'N/A'}
+- Debt to Equity: ${d.debtToEquity?.toFixed?.(2) || 'N/A'}
+- ROE: ${d.roe ? (d.roe * 100).toFixed(2) + '%' : 'N/A'}
+- Beta: ${d.beta?.toFixed?.(2) || 'N/A'}
 
-Return ONLY JSON with: valuationRatios[], qualityRatios[], leverageRatios[], technicals, riskFactors[], overallRiskScore, overallQualityScore, riskSummary, peerBenchmarks[].`,
-  }
+CRITICAL RULES:
+1. DO NOT invent data. If a ratio cannot be derived from the CURRENT DATA, output "—" for the value.
+2. overallRiskScore MUST be an integer between 1 and 10 (1 = Safest, 10 = Most Risky).
+3. overallQualityScore MUST be an integer between 1 and 10 (1 = Lowest Quality, 10 = Highest Quality).
+4. Do not output nested objects where arrays are expected.
+
+Return ONLY JSON matching this exact structure:
+{
+  "valuationRatios": [
+    {"name": "P/E Ratio", "value": "24.6x", "benchmark": "20.0x"}
+  ],
+  "qualityRatios": [
+    {"name": "ROE", "value": "15.4%", "benchmark": "12.0%"}
+  ],
+  "leverageRatios": [
+    {"name": "Debt/Equity", "value": "1.5x", "benchmark": "1.0x"}
+  ],
+  "technicals": {
+    "trend": "BULLISH|BEARISH|NEUTRAL",
+    "rsi": 55,
+    "support": 380.00,
+    "resistance": 420.00,
+    "volumeSignal": "Above Average"
+  },
+  "riskFactors": [
+    {"factor": "...", "severity": "High|Medium|Low", "description": "..."}
+  ],
+  "overallRiskScore": 4,
+  "overallQualityScore": 8,
+  "riskSummary": "A 2-sentence summary of the company's financial risk profile.",
+  "peerBenchmarks": [
+    {"ticker": "PEER1", "metric": "P/E", "value": "22.0x"}
+  ]
+}`
+  };
 }
 
 function buildNewsPrompt(ticker, d) {
+  const price = d.price?.toFixed?.(2) || 'N/A';
+  const target = d.targetMeanPrice?.toFixed?.(2) || 'N/A';
   return {
-    system: 'You are a market intelligence analyst. Return ONLY valid JSON.',
-    user: `Analyze market sentiment for ${ticker}.
+    system: 'You are a Senior Market Sentiment Analyst. You MUST return ONLY a valid JSON object. NEVER use markdown backticks.',
+    user: `Analyze the market sentiment and news narrative for ${ticker}.
 
-Price: ${d.price?.toFixed?.(2) || 'N/A'}, Consensus: ${d.recommendationKey || 'N/A'}, Target: ${d.targetMeanPrice?.toFixed?.(2) || 'N/A'}
-Sector: ${d.sector || 'N/A'}
+COMPANY CONTEXT:
+- Sector: ${d.sector || 'N/A'}
+- Industry: ${d.industry || 'N/A'}
+- Current Price: ${price}
+- Analyst Mean Target: ${target}
 
-Return ONLY JSON with: sentimentScore, sentimentLabel, sentimentRationale, analystConsensus, keyThemes[], bullCatalysts[], bearCatalysts[], macroExposure[], institutionalActivity, upcomingEvents[], tradingNote.`,
-  }
+CRITICAL RULES:
+1. sentimentScore MUST be an integer between 0 and 100 (0 = Extremely Bearish, 50 = Neutral, 100 = Extremely Bullish).
+2. sentimentLabel MUST logically match the score (e.g., >60 is Positive/Bullish, <40 is Negative/Bearish).
+3. If Analyst Mean Target is known, the upside in analystConsensus MUST be calculated as ((Target - Current) / Current) * 100.
+4. All arrays must contain at least one highly realistic, sector-specific item.
+
+Return ONLY JSON matching this exact structure:
+{
+  "sentimentScore": 65,
+  "sentimentLabel": "Positive",
+  "sentimentRationale": "A 2-sentence explanation of current market sentiment.",
+  "analystConsensus": {
+    "rating": "BUY|HOLD|SELL",
+    "meanTarget": 450.00,
+    "upside": 12.5,
+    "buyCount": 15,
+    "holdCount": 4,
+    "sellCount": 1,
+    "noteOnConsensus": "..."
+  },
+  "keyThemes": [
+    {"theme": "...", "sentiment": "POSITIVE|NEGATIVE|NEUTRAL", "timeframe": "Short-term", "detail": "..."}
+  ],
+  "bullCatalysts": [
+    {"catalyst": "...", "probability": "High|Medium|Low", "potentialImpact": "..."}
+  ],
+  "bearCatalysts": [
+    {"catalyst": "...", "probability": "High|Medium|Low", "potentialImpact": "..."}
+  ],
+  "macroExposure": [
+    {"factor": "Interest Rates", "exposure": "NEGATIVE|POSITIVE|NEUTRAL", "detail": "..."}
+  ],
+  "institutionalActivity": {
+    "shortInterestTrend": "Decreasing|Stable|Increasing",
+    "shortSqueezeRisk": "Low|Medium|High",
+    "institutionalOwnershipNote": "..."
+  },
+  "upcomingEvents": [
+    {"event": "Earnings Call", "expectedDate": "Next Quarter", "marketImplications": "..."}
+  ],
+  "tradingNote": "A brief 30-60 day tactical trading outlook."
+}`
+  };
 }
 
 /**
