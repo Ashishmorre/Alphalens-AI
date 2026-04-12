@@ -169,7 +169,10 @@ REQUIREMENTS:
 7. CRITICAL: sensitivityTable.values MUST be a 5x5 matrix (5 arrays, each with 5 numbers) matching waccRange.length x tgrRange.length
 8. keyDrivers MUST have at least 2 items with meaningful driver names (not "Unknown")
 9. comparisonPeers must be real companies in the same sector as ${d.sector || 'the industry'}
-10. NO HALLUCINATIONS: If you cannot determine a value, use null or 0, never invent`,
+${d.screenerPeers?.length > 0 ? `
+10. CRITICAL: Use these EXACT Screener peers for comparisonPeers: ${d.screenerPeers.slice(0, 5).map(p => p.ticker || p.name).join(', ')}
+Do not hallucinate peers - only use the provided list.` : ''}
+11. NO HALLUCINATIONS: If you cannot determine a value, use null or 0, never invent`,
   }
 }
 
@@ -250,6 +253,9 @@ CRITICAL RULES:
 5. Peer tickers MUST support ${d.currency || 'USD'} trading and be in ${d.sector || 'same sector'}.
 6. All arrays (valuationRatios, qualityRatios, leverageRatios, riskFactors, peerBenchmarks) MUST have at least 2-3 items with realistic data.
 7. peerBenchmarks MUST include at least 3 real peer companies from same sector as ${d.sector || 'the industry'}.
+${d.screenerPeers?.length > 0 ? `
+8. CRITICAL: Use these EXACT Screener peers for peerBenchmarks: ${d.screenerPeers.slice(0, 5).map(p => `${p.ticker}|${p.name}|${p.pe || 'N/A'}|${p.marketCap || 'N/A'}`).join(', ')}
+Use ONLY these real peers, do not hallucinate.` : ''}
 
 Return ONLY JSON matching this EXACT structure (field names must match):
 {
