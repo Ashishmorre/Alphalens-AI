@@ -1,9 +1,36 @@
 'use client'
 import { verdictClass, formatPrice, impactColor } from '@/lib/client-utils'
+import { validatePeers, validateAnalysisQuality, getSuggestedPeers } from '@/lib/sector-validator'
+import { MIN_CONFIDENCE_THRESHOLD } from '@/lib/ai-normalizer'
 
 export default function InvestmentThesis({ data, ticker, currency }) {
-  if (!data) return null
+  if (!data) {
+    return <InsufficientDataState reason="No analysis data available" />
+  }
+
   const d = data
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // VALIDATION: Check if analysis meets minimum quality standards
+  // ─────────────────────────────────────────────────────────────────────────
+  const validation = validateAnalysisQuality(d)
+
+  // If data came from API normalization with `isValid` flag, use that too
+  const isDataValid = d.isValid !== undefined ? d.isValid : validation.isValid
+  const errors = d.validationErrors || validation.errors
+
+  // Return insufficient data state if validation fails
+  if (!isDataValid || errors.length > 0) {
+    return <InsufficientDataState
+      reason="Analysis quality below acceptable threshold"
+      errors={errors}
+      ticker={ticker}
+    />
+  }
+
+  // Validate and filter peers by sector
+  const peerValidation = ticker ? validatePeers(ticker, d.comparisonPeers || []) : null
+  const validPeers = peerValidation?.validPeers?.map(p => p.ticker) || []
 
   const moatStars = Math.round(d.moatRating || 0)
 
@@ -173,28 +200,190 @@ export default function InvestmentThesis({ data, ticker, currency }) {
       </div>
 
       {/* Position sizing */}
-      {(d.positionSizing || d.comparisonPeers?.length) && (
+      {(isDataValid && (d.positionSizing || validPeers.length > 0)) && (
         <div className="card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-start' }}>
-          {d.positionSizing && (
+          {d.positionSizing && d.positionSizing !== 'None' && (
             <div>
               <SectionTitle>Recommended Positioning</SectionTitle>
               <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1rem', color: 'var(--teal)', fontWeight: 500 }}>{d.positionSizing}</span>
             </div>
           )}
-          {d.comparisonPeers?.length > 0 && (
+          {validPeers.length > 0 ? (
             <div>
-              <SectionTitle>Peer Group</SectionTitle>
+              <SectionTitle>Peer Group (Sector-Validated)</SectionTitle>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {d.comparisonPeers.map((p, i) => (
+                {validPeers.map((p, i) => (
                   <span key={i} style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.8rem', color: 'var(--txt-secondary)', background: 'rgba(0,212,170,0.05)', border: '1px solid rgba(0,212,170,0.12)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
                     {p}
                   </span>
                 ))}
               </div>
             </div>
+          ) : ticker && (
+            <div>
+              <SectionTitle>Peer Group</SectionTitle>
+              <div style={{ fontSize: '0.8rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)' }}>
+                No validated peers available for {ticker.toUpperCase()}
+              </div>
+            </div>
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Insufficient Data State Component
+ * Shows when analysis quality is below threshold
+ */
+function InsufficientDataState({ reason, errors = [], ticker }) {
+  const suggestedPeers = ticker ? getSuggestedPeers(ticker, 5) : []
+
+  return (
+    <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div className="card" style={{
+        padding: '2rem',
+        border: '2px solid rgba(239,68,68,0.3)',
+        background: 'rgba(239,68,68,0.05)'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          marginBottom: '1rem'
+        }}>
+          <span style={{
+            fontSize: '1.5rem',
+            color: '#ef4444'
+          }}>⚠</span>
+          <span style={{
+            fontFamily: 'var(--font-dm-mono)',
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: '#ef4444'
+          }}>
+            INSUFFICIENT DATA FOR ANALYSIS
+          </span>
+        </div>
+
+        <p style={{
+          fontFamily: 'var(--font-dm-mono)',
+          fontSize: '0.9rem',
+          color: 'var(--txt-secondary)',
+          marginBottom: '1.5rem',
+          lineHeight: 1.6
+        }}>
+          {reason}
+        </p>
+
+        {errors.length > 0 && (
+          <div style={{
+            background: 'rgba(0,0,0,0.3)',
+            borderRadius: '6px',
+            padding: '1rem',
+            marginBottom: '1.5rem'
+          }}>
+            <div style={{
+              fontSize: '0.7rem',
+              color: 'var(--txt-muted)',
+              fontFamily: 'var(--font-dm-mono)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              marginBottom: '0.75rem'
+            }}>
+              Validation Errors
+            </div>
+            <ul style={{
+              listStyle: 'none',
+              padding: 0,
+              margin: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem'
+            }}>
+              {errors.map((error, i) => (
+                <li key={i} style={{
+                  fontFamily: 'var(--font-dm-mono)',
+                  fontSize: '0.82rem',
+                  color: '#ef4444',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.5rem'
+                }}>
+                  <span>•</span>
+                  {error}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex',
+          gap: '2rem',
+          flexWrap: 'wrap'
+        }}>
+          <div>
+            <div style={{
+              fontSize: '0.7rem',
+              color: 'var(--txt-muted)',
+              fontFamily: 'var(--font-dm-mono)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              marginBottom: '0.5rem'
+            }}>
+              Minimum Requirements
+            </div>
+            <ul style={{
+              fontFamily: 'var(--font-dm-mono)',
+              fontSize: '0.8rem',
+              color: 'var(--txt-secondary)',
+              paddingLeft: '1rem',
+              lineHeight: 1.8
+            }}>
+              <li>Confidence ≥ {MIN_CONFIDENCE_THRESHOLD}%</li>
+              <li>At least 2 valid investment drivers</li>
+              <li>Target price must be present</li>
+              <li>Peers must be in same sector</li>
+            </ul>
+          </div>
+
+          {suggestedPeers.length > 0 && (
+            <div>
+              <div style={{
+                fontSize: '0.7rem',
+                color: 'var(--txt-muted)',
+                fontFamily: 'var(--font-dm-mono)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                marginBottom: '0.5rem'
+              }}>
+                Sector-Validated Peers
+              </div>
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                flexWrap: 'wrap'
+              }}>
+                {suggestedPeers.map((p, i) => (
+                  <span key={i} style={{
+                    fontFamily: 'var(--font-dm-mono)',
+                    fontSize: '0.8rem',
+                    color: 'var(--txt-secondary)',
+                    background: 'rgba(0,212,170,0.05)',
+                    border: '1px solid rgba(0,212,170,0.12)',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '4px'
+                  }}>
+                    {p.ticker}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
