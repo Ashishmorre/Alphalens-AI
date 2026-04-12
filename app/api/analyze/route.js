@@ -439,8 +439,23 @@ export async function POST(request) {
       modelConfig: { maxTokens: 4096, temperature: 0.1 },
     })
 
-    // Parse JSON response
-    const analysisData = safeParseJSON(rawResponse)
+    // Parse JSON response with defensive fallback
+    let analysisData
+    try {
+      analysisData = safeParseJSON(rawResponse)
+    } catch (parseError) {
+      // Try to extract JSON from markdown or text-wrapped response
+      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        try {
+          analysisData = safeParseJSON(jsonMatch[0])
+        } catch {
+          throw parseError
+        }
+      } else {
+        throw parseError
+      }
+    }
 
     return NextResponse.json(
       { success: true, data: analysisData, error: null },
