@@ -68,6 +68,7 @@ Return ONLY JSON matching this structure:
 {
   "verdict": "BUY|HOLD|SELL",
   "confidence": 85,
+  "currentPrice": ${price === 'N/A' ? 0 : price},
   "targetPrice": 422.50,
   "upsideDownside": 5.8,
   "timeHorizon": "12-Month",
@@ -75,7 +76,10 @@ Return ONLY JSON matching this structure:
   "bullCase": { "title": "...", "targetPrice": 480, "probability": 30, "points": ["..."] },
   "bearCase": { "title": "...", "targetPrice": 350, "probability": 20, "points": ["..."] },
   "baseCase": { "title": "...", "targetPrice": 422.50, "probability": 50 },
-  "keyDrivers": [{"driver": "...", "detail": "...", "impact": "POSITIVE|NEGATIVE"}],
+  "keyDrivers": [
+    {"driver": "Revenue Growth", "detail": "Strong top-line expansion", "impact": "POSITIVE"},
+    {"driver": "Margin Expansion", "detail": "Operating efficiency improvements", "impact": "POSITIVE"}
+  ],
   "moatRating": 4,
   "moatType": "Wide Moat",
   "growthQuality": "High Quality",
@@ -163,7 +167,9 @@ REQUIREMENTS:
 5. 5 projection years exactly
 6. CRITICAL: Ensure ALL calculations are mathematically consistent
 7. CRITICAL: sensitivityTable.values MUST be a 5x5 matrix (5 arrays, each with 5 numbers) matching waccRange.length x tgrRange.length
-8. NO HALLUCINATIONS: If you cannot determine a value, use null or 0, never invent`,
+8. keyDrivers MUST have at least 2 items with meaningful driver names (not "Unknown")
+9. comparisonPeers must be real companies in the same sector as ${d.sector || 'the industry'}
+10. NO HALLUCINATIONS: If you cannot determine a value, use null or 0, never invent`,
   }
 }
 
