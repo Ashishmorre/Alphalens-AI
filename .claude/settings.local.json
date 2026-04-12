@@ -43,7 +43,9 @@
       "WebFetch(domain:alphalens-ai-beta.vercel.app)",
       "Bash(wc:*)",
       "Bash(xxd)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm audit:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
