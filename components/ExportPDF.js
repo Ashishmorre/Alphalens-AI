@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
 
+import { strictValidateTicker } from '@/lib/security'
+
 function formatNum(n) {
   if (n == null || isNaN(n)) return '—'
   if (Math.abs(n) >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T'
@@ -245,7 +247,16 @@ export default function ExportPDF({ stockData, analysisData, activeTab }) {
         doc.text(`Page ${i} of ${pageCount}`, W - margin - 40, H - 12)
       }
 
-      const filename = `AlphaLens_${stockData?.ticker || 'Report'}_${activeTab}_${new Date().toISOString().slice(0, 10)}.pdf`
+      // Sanitize ticker for filename to prevent path traversal
+const validatedTicker = stockData?.ticker
+  ? strictValidateTicker(String(stockData.ticker))
+  : { valid: false }
+const safeTicker = validatedTicker.valid ? validatedTicker.ticker : 'Report'
+
+// Generate filename with path-safe components only
+const dateStr = new Date().toISOString().slice(0, 10)
+const safeTab = String(activeTab).replace(/[^a-zA-Z0-9]/g, '')
+const filename = `AlphaLens_${safeTicker}_${safeTab}_${dateStr}.pdf`
       doc.save(filename)
 
     } catch (err) {

@@ -41,7 +41,9 @@
       "Bash(curl -s \"https://api.vercel.com/v6/deployments?projectId=Alphalens-AI&limit=3\")",
       "WebFetch(domain:alphalens-ai.vercel.app)",
       "WebFetch(domain:alphalens-ai-beta.vercel.app)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(xxd)",
+      "Bash(npm view:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
