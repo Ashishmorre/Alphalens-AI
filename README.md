@@ -175,4 +175,4 @@ AlphaLens AI is for informational and educational purposes only. It does not con
 
 ---
 
-*Built by Ashish & Aman · CFA Candidate · BCom Hons*
+*Built by Ashish & Aman Agrahari · CFA Candidate · BCom Hons*
