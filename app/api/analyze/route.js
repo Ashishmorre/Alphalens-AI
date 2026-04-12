@@ -37,9 +37,12 @@ function buildPrompt(ticker, data, analysisType) {
 }
 
 function buildThesisPrompt(ticker, d) {
+  const price = d.price?.toFixed?.(2) || 'N/A'
+  const currency = d.currency || 'USD'
+
   return {
-    system: 'You are a senior equity analyst at a top hedge fund. Return ONLY valid JSON with no markdown.',
-    user: `Analyze ${ticker} (${d.name}), trading at ${d.price?.toFixed?.(2) || 'N/A'} ${d.currency || 'USD'}.
+    system: 'You are a Tier-1 Institutional Equity Analyst. You MUST return ONLY a valid JSON object. You are strictly forbidden from hallucinating illogical math.',
+    user: `Analyze ${ticker} (${d.name}), trading at ${price} ${currency}.
 
 Financials: Market Cap ${fmtNumber(d.marketCap)}, P/E ${d.pe?.toFixed?.(1) || 'N/A'}, Fwd P/E ${d.forwardPE?.toFixed?.(1) || 'N/A'}
 Revenue ${fmtNumber(d.revenue)}, EBITDA ${fmtNumber(d.ebitda)}, FCF ${fmtNumber(d.freeCashFlow)}
@@ -47,22 +50,52 @@ Margins: Net ${fmtPercent(d.profitMargin)}, Gross ${fmtPercent(d.grossMargin)}, 
 Growth: Revenue ${fmtPercent(d.revenueGrowth)}, Beta ${d.beta?.toFixed?.(2) || 'N/A'}
 Sector: ${d.sector || 'N/A'}, Industry: ${d.industry || 'N/A'}
 
-Return ONLY JSON with:
-- verdict, confidence, targetPrice, upsideDownside, timeHorizon, thesisSummary
-- bullCase: { title, targetPrice, probability, points[] }
-- bearCase: { title, targetPrice, probability, points[] }
-- baseCase: { title, targetPrice, probability }
-- keyDrivers[], moatRating, moatType, growthQuality, catalysts[], risks[], positionSizing, comparisonPeers[]`,
+CRITICAL MATH RULES - VIOLATION IS STRICTLY FORBIDDEN:
+1. Target Price MUST be a realistic 12-month projection based on historical multiples and analyst consensus. DO NOT guess.
+2. Confidence score MUST be an integer between 60 and 95 based on data clarity. DO NOT output numbers like 0.6, 5, or 100.
+3. The verdict (BUY/HOLD/SELL) MUST logically match the target vs current price ratio:
+   - If target > current: verdict must be BUY or HOLD (upside available)
+   - If target < current: verdict must be SELL or HOLD (downside risk)
+   - NEVER say BUY when target is lower than current price (logical impossibility).
+4. comparisonPeers MUST be real companies strictly operating in the ${d.sector || 'same'} sector/industry. NEVER hallucinate random tickers.
+5. All case probabilities (bull + base + bear) should sum to approximately 100.
+6. upsideDownside MUST be calculated as: ((targetPrice - ${price === 'N/A' ? 0 : price}) / ${price === 'N/A' ? 1 : price}) * 100
+7. If current price is ${price}, then:
+   - A target of ₹422.50 on ₹399.35 is +5.8% upside, NOT +0.0%
+   - A target below current is negative upside (downside)
+
+Return ONLY JSON matching this structure:
+{
+  "verdict": "BUY|HOLD|SELL",
+  "confidence": 85,
+  "targetPrice": 422.50,
+  "upsideDownside": 5.8,
+  "timeHorizon": "12-Month",
+  "thesisSummary": "...",
+  "bullCase": { "title": "...", "targetPrice": 480, "probability": 30, "points": ["..."] },
+  "bearCase": { "title": "...", "targetPrice": 350, "probability": 20, "points": ["..."] },
+  "baseCase": { "title": "...", "targetPrice": 422.50, "probability": 50 },
+  "keyDrivers": [{"driver": "...", "detail": "...", "impact": "POSITIVE|NEGATIVE"}],
+  "moatRating": 4,
+  "moatType": "Wide Moat",
+  "growthQuality": "High Quality",
+  "catalysts": ["..."],
+  "risks": ["..."],
+  "positionSizing": "Medium",
+  "comparisonPeers": ["PEER1", "PEER2"]
 }
+
+ABSOLUTE REQUIREMENT: ALL NUMBERS MUST BE MATHEMATICALLY CONSISTENT AND LOGICALLY VALID.`,
   }
+}
 
 function buildDCFPrompt(ticker, d) {
   const price = d.price?.toFixed?.(2) || 100
   return {
-    system: 'You are a CFA charterholder. You MUST return ONLY a valid JSON object, no markdown, no code blocks, no explanatory text.',
+    system: 'You are a Quantitative Financial Modeler. You MUST return ONLY a valid JSON object. Your internal math calculations must be flawless.',
     user: `Build a 5-year DCF model for ${ticker}.
 
-CURRENT DATA:
+CURRENT INPUT DATA (do not deviate from these base numbers):
 - Price: ${price} ${d.currency || 'USD'}
 - Revenue: ${fmtNumber(d.revenue)}
 - EBITDA: ${fmtNumber(d.ebitda)}
@@ -70,8 +103,22 @@ CURRENT DATA:
 - Operating Margin: ${fmtPercent(d.operatingMargin)}
 - Total Debt: ${fmtNumber(d.totalDebt)}
 - Cash: ${fmtNumber(d.totalCash)}
+- Shares Outstanding: ${d.sharesOutstanding || 'estimate based on market cap'}
 
-Return a SINGLE VALID JSON OBJECT with this exact structure (numbers only, no currency symbols in values):
+CRITICAL MATH RULES - ANY VIOLATION RENDERS OUTPUT USELESS:
+1. All projections MUST scale logically from the CURRENT DATA provided above.
+2. DO NOT jump magnitudes arbitrarily (e.g., if Revenue is in Billions, projections stay in Billions).
+3. intrinsicValuePerShare MUST logically correlate with enterpriseValue and outstanding shares.
+   Formula: equityValue = enterpriseValue + cash - debt; intrinsicValuePerShare = equityValue / sharesOutstanding
+4. marginOfSafety MUST be calculated as: ((intrinsicValuePerShare - ${price}) / intrinsicValuePerShare) * 100
+5. upside MUST be calculated as: ((intrinsicValuePerShare - ${price}) / ${price}) * 100
+6. dcfRating MUST be UNDERVALUED if intrinsic > current, OVERVALUED if intrinsic < current, NEUTRAL if within 10%
+7. If intrinsicValuePerShare = 125.50 and current = 399.35, then:
+   - upside = -68.5% (negative, because 125 < 399)
+   - dcfRating = OVERVALUED (red)
+   - This is NOT Undervalued with +22.6% upside - that is mathematically impossible
+
+Return a SINGLE VALID JSON OBJECT with this exact structure (numbers only):
 {
   "assumptions": {
     "wacc": 10.0,
@@ -81,25 +128,21 @@ Return a SINGLE VALID JSON OBJECT with this exact structure (numbers only, no cu
     "ebitdaMargins": [20.0, 21.0, 22.0, 23.0, 24.0]
   },
   "projections": [
-    {"year": 1, "revenue": 1000000, "ebitda": 200000, "ebit": 150000, "nopat": 118500, "capex": -50000, "nwcChange": -10000, "fcf": 58500},
-    {"year": 2, ...},
-    {"year": 3, ...},
-    {"year": 4, ...},
-    {"year": 5, ...}
+    {"year": 1, "revenue": 1000000000, "ebitda": 200000000, "ebit": 150000000, "nopat": 118500000, "capex": -50000000, "nwcChange": -10000000, "fcf": 58500000}
   ],
-  "pvFCFs": 280000,
-  "terminalValue": 1500000,
-  "pvTerminalValue": 950000,
-  "enterpriseValue": 1230000,
-  "equityValue": 1000000,
-  "intrinsicValuePerShare": 125.5,
+  "pvFCFs": 280000000,
+  "terminalValue": 1500000000,
+  "pvTerminalValue": 950000000,
+  "enterpriseValue": 1230000000,
+  "equityValue": 1000000000,
+  "intrinsicValuePerShare": 125.50,
   "marginOfSafety": 15.0,
-  "upside": 22.5,
-  "dcfRating": "UNDERVALUED",
+  "upside": -68.5,
+  "dcfRating": "OVERVALUED",
   "sensitivityTable": {
     "waccRange": [8.0, 9.0, 10.0, 11.0, 12.0],
     "tgrRange": [1.5, 2.0, 2.5, 3.0, 3.5],
-    "values": [[150, 140, 130], [145, 135, 125], ...]
+    "values": [[150, 140, 130], [145, 135, 125]]
   },
   "keyRisksToModel": ["Risk 1", "Risk 2"],
   "analystNote": "Brief DCF methodology note"
@@ -111,7 +154,8 @@ REQUIREMENTS:
 3. All numeric values must be plain numbers (not strings)
 4. WACC in percentage points (e.g., 10.0 for 10%)
 5. 5 projection years exactly
-6. Ensure calculations are mathematically consistent`,
+6. CRITICAL: Ensure ALL calculations are mathematically consistent
+7. NO HALLUCINATIONS: If you cannot determine a value, use null or 0, never invent`,
   }
 }
 
@@ -213,7 +257,7 @@ export async function POST(request) {
     const rawResponse = await callAIWithRetry({
       systemPrompt: prompt.system,
       userPrompt: prompt.user,
-      modelConfig: { maxTokens: 4096 },
+      modelConfig: { maxTokens: 4096, temperature: 0.1 },
     })
 
     // Parse JSON response
