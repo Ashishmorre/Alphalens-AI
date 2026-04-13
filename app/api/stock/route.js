@@ -19,6 +19,7 @@ import {
 import { fetchNSEData, parseIndASXBRL } from '@/lib/nse-xbrl-parser'
 import { calculateRatiosFromXBRL } from '@/lib/financial-utils'
 import { fetchScreenerData, mergeScreenerData, isScreenerEligible } from '@/lib/screener-scraper'
+import { fetchTradingViewData, mergeTradingViewData, tickerToTradingView } from '@/lib/tradingview-scraper'
 
 const RATE_LIMIT = RATE_LIMIT_PRESETS.stockData
 
@@ -170,6 +171,33 @@ export async function GET(request) {
       } catch (screenerError) {
         // Graceful degradation — don't fail if Screener fetch fails
         console.warn('Screener data fetch failed (graceful degradation):', screenerError.message)
+      }
+    }
+
+    // ─── TradingView Fallback (4th source) ─────────────────────────────────
+    // Fills any remaining null fields using Playwright-scraped TradingView data.
+    // Runs ONLY if critical fields are still missing after Yahoo + XBRL + Screener.
+    // Skipped when Screener already covered all ratios (avoids unnecessary 45s scrape).
+    const missingCritical = [
+      data.pe, data.priceToBook, data.debtToEquity,
+      data.roe, data.currentRatio, data.evToEbitda,
+    ].filter(v => v === null || v === undefined || v === 0).length
+
+    if (missingCritical >= 2) {
+      try {
+        const tv = tickerToTradingView(validation.ticker)
+        if (tv) {
+          // Hard 20-second limit — Playwright is slow; degrade gracefully if timeout
+          const tvTimeout = new Promise(resolve => setTimeout(() => resolve(null), 20000))
+          const tvFetch   = fetchTradingViewData(tv.exchange, tv.symbol)
+          const tvData    = await Promise.race([tvFetch, tvTimeout])
+          if (tvData) {
+            Object.assign(data, mergeTradingViewData(data, tvData))
+          }
+        }
+      } catch (tvError) {
+        // Graceful degradation — TradingView scraping is best-effort
+        console.warn('TradingView data fetch failed (graceful degradation):', tvError.message)
       }
     }
 

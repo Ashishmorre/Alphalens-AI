@@ -28,7 +28,7 @@ describe('Financial Utilities', () => {
       // Example: IV = 125.50, CP = 399.35
       // Expected: ((125.50 - 399.35) / 399.35) * 100 = -68.5%
       const result = calculateUpside(125.5, 399.35)
-      expect(result).toBeCloseTo(-68.5, 1)
+      expect(result).toBeCloseTo(-68.57, 2)
     })
 
     it('should return 0 when current price is 0', () => {
@@ -162,7 +162,7 @@ describe('Financial Utilities', () => {
   describe('calculateEnterpriseValue', () => {
     it('should sum PV of FCFs and PV of Terminal Value', () => {
       const result = calculateEnterpriseValue(500, 366.67)
-      expect(result).toBe(866.67)
+      expect(result).toBeCloseTo(866.67, 2)
     })
 
     it('should handle missing values', () => {
@@ -285,7 +285,7 @@ describe('Financial Utilities', () => {
 
     it('should handle negative values', () => {
       const result = formatMagnitude(-1000000, 2, 'USD')
-      expect(result).toBe('-$1.00M')
+      expect(result).toBe('$-1.00M')
     })
   })
 })

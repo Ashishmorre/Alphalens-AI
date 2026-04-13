@@ -125,13 +125,51 @@ INPUT DATA — use these exact figures as your base:
 - Sector: ${d.sector || 'N/A'}
 
 MATH RULES (violations = unusable output):
-1. All revenue/FCF numbers MUST stay in the same magnitude as the input (if revenue is billions, keep billions).
-2. intrinsicValuePerShare = equityValue / sharesOutstanding
-3. equityValue = enterpriseValue + cash - debt
-4. marginOfSafety = ((intrinsicValuePerShare - ${price}) / intrinsicValuePerShare) * 100
-5. upside = ((intrinsicValuePerShare - ${price}) / ${price}) * 100
-6. dcfRating: "UNDERVALUED" if upside > 10%, "OVERVALUED" if upside < -10%, else "NEUTRAL"
-7. sensitivityTable.values MUST be a 5×5 matrix — 5 rows (one per tgrRange), 5 columns (one per waccRange)
+1. UNIT CONSISTENCY (CRITICAL - ABSOLUTE NUMBERS ONLY): ALL currency values (Revenue, EBITDA, FCF, Cash, Debt, EV, EquityValue) MUST be output as RAW ABSOLUTE NUMBERS (e.g., 2,500,000,000). NEVER use units like "2.5B" or "2500M". The frontend expects raw numbers for correct per-share calculations. Input may be formatted (e.g., "$2.5B" or "₹600.32B") - you MUST convert these to absolute numbers (2,500,000,000) before any calculations.
+2. SHARES OUTSTANDING: If not provided, calculate as: SharesOutstanding = MarketCap / CurrentPrice. Use MarketCap in same units as Revenue.
+3. FCF CALCULATION & CONSISTENCY:
+   - NOPAT = EBIT × (1 - TaxRate)
+   - FCF = NOPAT + Depreciation - CapEx - ChangeInNWC
+   - CapEx MUST be negative (cash outflow)
+   - pvFCFs = Σ(FCF_YearN / (1+WACC)^N) for N=1 to 5
+   - VERIFICATION: Recalculate pvFCFs from the 5 projection years. The displayed sum MUST match the calculated pvFCFs value.
+4. TERMINAL VALUE FORMULA (CRITICAL): TV = FCF_Year5 × (1 + TerminalGrowth/100) / ((WACC/100) - (TerminalGrowth/100)). Example: If FCF5=2.5B, WACC=10%, TGR=2.5%, then TV = 2.5 × 1.025 / (0.10 - 0.025) = 34.17B. TV MUST be POSITIVE.
+5. DISCOUNT FACTORS: Year 1 = 1/(1+WACC), Year 2 = 1/(1+WACC)^2, etc. Compute PV for each FCF year.
+6. ENTERPRISE VALUE: EV = PV of FCFs (years 1-5) + PV of Terminal Value. If this is negative, your inputs are wrong — recalculate. Healthy companies MUST have positive EV.
+7. EQUITY VALUE (GUARD AGAINST NEGATIVE):
+   - Step 1: Calculate Enterprise Value: EV = PV(FCFs_Y1-5) + PV(TerminalValue)
+   - Step 2: Calculate Equity Value: EquityValue = EV + Cash - Debt
+   - Step 3: If EquityValue < 0 (high leverage), set EquityValue = Math.max(EV × 0.5, MarketCap × 0.1) to reflect distress but keep positive
+   - Step 4: EquityValue MUST be positive before calculating per-share value
+8. INTRINSIC VALUE (NEVER NEGATIVE): intrinsicValuePerShare = Math.max(EquityValue / SharesOutstanding, 0.01). NEVER return negative intrinsic value.
+9. P/E (TTM) CALCULATION:
+   - P/E (TTM) = CurrentPrice / EPS(TTM)
+   - EPS(TTM) = NetIncome(TTM) / SharesOutstanding
+   - If EPS data not provided, estimate: EPS = (Revenue × NetMargin) / SharesOutstanding
+   - Use provided Price/Earnings ratio d.pe from input data if available
+10. MARGIN OF SAFETY: marginOfSafety = ((intrinsicValuePerShare - ${price}) / intrinsicValuePerShare) * 100. Range: -100% to +100%.
+11. UPSIDE: upside = ((intrinsicValuePerShare - ${price}) / ${price}) * 100.
+12. DCF RATING: "UNDERVALUED" if upside > 10%, "OVERVALUED" if upside < -10%, else "NEUTRAL".
+
+SENSITIVITY ANALYSIS (MUST OUTPUT 5×5 MATRIX with rowHeaders/waccRange and colHeaders/tgrRange):
+- Base: wacc = computed WACC percent (e.g., 10), tgr = computed Terminal Growth Rate (e.g., 2.5)
+- rowHeaders (WACC values): MUST be [8.0, 9.0, 10.0, 11.0, 12.0] (5 values)
+- colHeaders (Terminal Growth values): MUST be [1.5, 2.0, 2.5, 3.0, 3.5] (5 values)
+- DCF MATH PROTOCOL per cell:
+  1. Forecast FCF for 5 years using base assumptions
+  2. Calculate Terminal Value: TV = (Year 5 FCF * (1 + TGR%)) / (WACC% - TGR%)
+  3. Discount all to PV
+  4. Equity Value = (Sum of PVs) - Net Debt + Cash (in Millions)
+  5. Intrinsic Value Per Share = Equity Value / Shares Outstanding
+- For EACH combination (wacc in rowHeaders, tgr in colHeaders):
+   * TV = FCF_Year5 × (1 + tgr/100) / ((wacc/100) - (tgr/100))
+   * EV = PV_of_FCFs + (TV / (1+wacc/100)^5)
+   * Equity = EV + Cash - Debt
+   * ValuePerShare = Equity / SharesOutstanding
+- Return EXACTLY 5 rows × 5 columns of per-share values
+- JSON SCHEMA requirement: sensitivityTable MUST include "rowHeaders" (WACC array), "colHeaders" (TGR array), and "grid" (5x5 array of intrinsic values)
+- REQUIRED: Return valid numbers in ALL 25 cells. NO nulls. NO "N/A". NO placeholders.
+- CORE RULE: All currency outputs MUST be in MILLIONS (1 Billion = 1000) to maintain per-share valuation accuracy.
 
 RETURN ONLY THIS JSON STRUCTURE — NO MARKDOWN — replace ALL values with real computed numbers for ${ticker}:
 {
@@ -187,65 +225,57 @@ function buildRiskPrompt(ticker, d) {
   const debtEq = d.debtToEquity?.toFixed?.(2) || '—'
   const roe = d.roe ? (d.roe * 100).toFixed(2) + '%' : '—'
   const currentRatio = d.currentRatio?.toFixed?.(2) || '—'
-  const marketCap = fmtNumber(d.marketCap)
-  const fcf = fmtNumber(d.freeCashFlow)
-  const fcfMargin = d.freeCashFlow && d.revenue ? ((d.freeCashFlow / d.revenue) * 100).toFixed(1) + '%' : '—'
+  const fcfMargin = d.freeCashFlow && d.revenue
+    ? ((d.freeCashFlow / d.revenue) * 100).toFixed(1) + '%'
+    : '—'
 
-  // Sector median from Screener.in (real data for Indian stocks)
-  const industryPE = d.screenerRatios?.industryPE?.toFixed(2) || null
-  const sectorMedianPE = industryPE ? `${industryPE}x` : '<compute_real_sector_median_pe>x'
-  const sectorMedianFwdPE = industryPE ? `${(d.screenerRatios.industryPE * 0.9).toFixed(1)}x` : '<compute_real_sector_median_fwd_pe>x'
-  const sectorMedianEvEbitda = d.screenerRatios?.industryPE ? `${(d.screenerRatios.industryPE * 0.7).toFixed(1)}x` : '<compute_real_sector_median_ev_ebitda>x'
+  // Sector median from Screener.in industryPE (safe null-check)
+  const industryPE = (d.screenerRatios?.industryPE != null)
+    ? Number(d.screenerRatios.industryPE)
+    : null
+  const sectorMedianPE     = industryPE != null ? `${industryPE.toFixed(1)}x`               : '<sector_median_pe>x'
+  const sectorMedianFwdPE  = industryPE != null ? `${(industryPE * 0.9).toFixed(1)}x`       : '<sector_median_fwd_pe>x'
+  const sectorMedianEvEbitda = industryPE != null ? `${(industryPE * 0.65).toFixed(1)}x`    : '<sector_median_ev_ebitda>x'
 
-  // Build peer rows from screener data (real data); fallback to AI-fill instructions
-  const buildPeerRows = () => {
-    const peers = d.screenerPeers?.filter(p => p.name && p.pe)
-    if (peers?.length >= 2) {
-      return peers.slice(0, 3).map(p => {
-        const peerNetMargin = p.netMargin != null ? `${p.netMargin.toFixed(1)}%` : (p.opm != null ? `${p.opm.toFixed(1)}%` : '<net_margin>%')
-        const peerPE = p.pe != null ? `${p.pe}x` : '<pe>x'
-        const peerTicker = p.ticker || p.name.replace(/\s+/g,'').toUpperCase().slice(0,10)
-        const peerName = p.name
-        return `    {"ticker": "${peerTicker}", "name": "${peerName}", "pe": "${peerPE}", "evEbitda": "<ev_ebitda>x", "margin": "${peerNetMargin}"}`
-      }).join(',\n')
-    }
-    // Fallback: instructions for AI to fill
-    return [
-      '    {"ticker": "<real_peer_1_ticker>", "name": "<real_peer_1_company_name>", "pe": "<real_peer_1_pe>x", "evEbitda": "<real_peer_1_ev_ebitda>x", "margin": "<real_peer_1_net_margin>%"}',
-      '    {"ticker": "<real_peer_2_ticker>", "name": "<real_peer_2_company_name>", "pe": "<real_peer_2_pe>x", "evEbitda": "<real_peer_2_ev_ebitda>x", "margin": "<real_peer_2_net_margin>%"}',
-      '    {"ticker": "<real_peer_3_ticker>", "name": "<real_peer_3_company_name>", "pe": "<real_peer_3_pe>x", "evEbitda": "<real_peer_3_ev_ebitda>x", "margin": "<real_peer_3_net_margin>%"}',
-    ].join(',\n')
+  // Build plain-text peer context for the INJECTED DATA section (NOT inside JSON template)
+  const buildPeerContext = () => {
+    const peers = d.screenerPeers?.filter(p => p.name && p.pe != null)
+    if (!peers?.length) return ''
+    const rows = peers.slice(0, 5).map(p => {
+      const name = String(p.name).replace(/["\\]/g, "'") // sanitise any quotes
+      const pePct = Number(p.pe).toFixed(1)
+      return `  - ${name} (P/E: ${pePct}x, MCap: ${fmtNumber(p.marketCap)})`
+    }).join('\n')
+    return `\nSCREENER PEER DATA — use these for peerBenchmarks (do NOT hallucinate other companies):\n${rows}`
   }
 
-  // Calculate technicals from raw data — prefer ma50/ma200 aliases
-  const ma50 = d.ma50 || d.fiftyDayAverage || 0
-  const ma200 = d.ma200 || d.twoHundredDayAverage || 0
+  // Technicals — read ma50/ma200 aliases first, then raw Yahoo fields
+  const ma50  = d.ma50  || d.fiftyDayAverage      || 0
+  const ma200 = d.ma200 || d.twoHundredDayAverage  || 0
   const weekHigh52 = d.weekHigh52 || 0
-  const weekLow52 = d.weekLow52 || 0
-  const volume = d.volume || 0
+  const weekLow52  = d.weekLow52  || 0
+  const volume    = d.volume    || 0
   const avgVolume = d.avgVolume || 0
 
-  // Calculate momentum indicators
-  const priceVs50DMA = ma50 > 0 && d.price ? ((d.price - ma50) / ma50 * 100).toFixed(1) : '0'
-  const priceVs200DMA = ma200 > 0 && d.price ? ((d.price - ma200) / ma200 * 100).toFixed(1) : '0'
-  const weekPosition52 = weekHigh52 > weekLow52 && d.price ? ((d.price - weekLow52) / (weekHigh52 - weekLow52) * 100).toFixed(0) : '50'
+  const priceVs50DMA   = ma50  > 0 && d.price ? ((d.price - ma50)  / ma50  * 100).toFixed(1) : '0'
+  const priceVs200DMA  = ma200 > 0 && d.price ? ((d.price - ma200) / ma200 * 100).toFixed(1) : '0'
+  const weekPosition52 = weekHigh52 > weekLow52 && d.price
+    ? ((d.price - weekLow52) / (weekHigh52 - weekLow52) * 100).toFixed(0)
+    : '50'
 
-  // Volume signal
   let volumeSignal = 'Normal'
   if (volume && avgVolume) {
     const ratio = volume / avgVolume
     volumeSignal = ratio > 1.2 ? 'Above Average' : ratio < 0.8 ? 'Below Average' : 'Normal'
   }
 
-  // Trend determination
   let trend = 'NEUTRAL'
   if (d.price) {
     if (ma50 > ma200 && d.price > ma50) trend = 'BULLISH'
     else if (ma50 < ma200 && d.price < ma50) trend = 'BEARISH'
   }
 
-  // Support/Resistance levels
-  const support = ma50 > 0 ? ma50 : weekLow52
+  const support    = ma50  > 0 ? ma50  : weekLow52
   const resistance = ma200 > 0 ? ma200 : weekHigh52
 
   return {
@@ -254,18 +284,19 @@ function buildRiskPrompt(ticker, d) {
 
 INJECTED FINANCIAL DATA (MUST USE THESE EXACT VALUES):
 - Current Price: ${price}
-- Market Cap: ${marketCap}
+- Market Cap: ${fmtNumber(d.marketCap)}
 - P/E (TTM): ${pe}x
 - Forward P/E: ${fwdPe}x
 - EV/EBITDA: ${evEbitda}
 - Debt to Equity: ${debtEq}
 - ROE: ${roe}
-- Free Cash Flow: ${fcf}
+- Free Cash Flow: ${fmtNumber(d.freeCashFlow)}
+- FCF Margin: ${fcfMargin}
 - Current Ratio: ${currentRatio}
 - Beta: ${d.beta?.toFixed?.(2) || '—'}
 - Avg Volume: ${fmtNumber(d.avgVolume)}
-- Sector Median P/E: ${sectorMedianPE}${ industryPE ? ' (from Screener.in, USE THIS EXACT VALUE for sectorMedian P/E)' : ' (estimate from your knowledge)'}
-
+- Sector/Industry Median P/E: ${sectorMedianPE}${industryPE != null ? ' — USE THIS EXACT value for sectorMedian of P/E (TTM).' : ' — estimate from sector knowledge.'}
+${buildPeerContext()}
 INJECTED TECHNICAL DATA (PRE-CALCULATED):
 - Trend: ${trend}
 - Price vs 50DMA: ${priceVs50DMA}%
@@ -278,21 +309,18 @@ INJECTED TECHNICAL DATA (PRE-CALCULATED):
 
 CRITICAL RULES:
 1. USE ALL injected data EXACTLY as provided. Do NOT invent new values.
-2. Risk Factors MUST analyze based on: Liquidity (Current Ratio), Leverage (D/E), Valuation (P/E).
-3. REPLACE all placeholders with YOUR analysis - generic descriptions are FORBIDDEN.
+2. Risk Factors MUST analyze: Liquidity (Current Ratio), Leverage (D/E), Valuation (P/E).
+3. REPLACE all <placeholder> tags with YOUR analysis. Generic descriptions are FORBIDDEN.
 4. overallRiskScore & overallQualityScore MUST be integers 1-10.
-5. Peer tickers MUST support ${d.currency || 'USD'} trading and be in ${d.sector || 'same sector'}.
-6. All arrays (valuationRatios, qualityRatios, leverageRatios, riskFactors, peerBenchmarks) MUST have at least 2-3 items with realistic data.
-7. peerBenchmarks MUST include at least 3 real peer companies from same sector as ${d.sector || 'the industry'}.
-${d.screenerPeers?.length > 0 ? `
-8. CRITICAL: Use these EXACT Screener peers for peerBenchmarks: ${d.screenerPeers.slice(0, 5).map(p => `${p.ticker}|${p.name}|${p.pe || 'N/A'}|${p.marketCap || 'N/A'}`).join(', ')}
-Use ONLY these real peers, do not hallucinate.` : ''}
+5. peerBenchmarks MUST include 3 real peer companies from ${d.sector || 'same sector'} in ${d.currency || 'USD'}.
+6. All arrays must have at least 2-3 items with realistic data.
+7. Use the SCREENER PEER DATA above (if provided) for peerBenchmarks company names and P/E.
 
-Return ONLY JSON matching this EXACT structure (field names must match):
+Return ONLY JSON matching this EXACT structure (field names must match exactly):
 {
   "overallRiskScore": ${Math.max(1, Math.min(10, Math.round((d.beta || 1) * 5)))},
   "overallQualityScore": ${Math.max(1, Math.min(10, Math.round((d.roe || 0.12) * 100 / 2)))},
-  "riskSummary": "Write a 2-sentence institutional summary of risk profile using injected data.",
+  "riskSummary": "<2-sentence institutional risk summary using injected data>",
   "technicals": {
     "trend": "${trend}",
     "momentum": "${Number(priceVs50DMA) > 0 ? 'UPTREND' : Number(priceVs50DMA) < 0 ? 'DOWNTREND' : 'NEUTRAL'}",
@@ -306,30 +334,31 @@ Return ONLY JSON matching this EXACT structure (field names must match):
     }
   },
   "valuationRatios": [
-    {"metric": "P/E (TTM)", "value": "${pe}x", "sectorMedian": "${sectorMedianPE}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence on P/E vs sector median>"},
+    {"metric": "P/E (TTM)", "value": "${pe}x", "sectorMedian": "${sectorMedianPE}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence vs sector median>"},
     {"metric": "Forward P/E", "value": "${fwdPe}x", "sectorMedian": "${sectorMedianFwdPE}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence on growth-adjusted valuation>"},
     {"metric": "EV/EBITDA", "value": "${evEbitda}x", "sectorMedian": "${sectorMedianEvEbitda}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence on EV/EBITDA vs sector>"}
   ],
   "qualityRatios": [
     {"metric": "ROE", "value": "${roe}", "benchmark": "12.0%", "rating": "${d.roe > 0.15 ? 'EXCELLENT' : d.roe > 0.10 ? 'GOOD' : 'AVERAGE'}"},
     {"metric": "Current Ratio", "value": "${currentRatio}x", "benchmark": "1.5x", "rating": "${Number(currentRatio) > 2 ? 'EXCELLENT' : Number(currentRatio) > 1.5 ? 'GOOD' : 'AVERAGE'}"},
-    {"metric": "FCF Margin", "value": "${d.freeCashFlow && d.revenue ? ((d.freeCashFlow / d.revenue) * 100).toFixed(1) + '%' : '—'}", "benchmark": "10%", "rating": "AVERAGE"}
+    {"metric": "FCF Margin", "value": "${fcfMargin}", "benchmark": "10%", "rating": "<EXCELLENT|GOOD|AVERAGE|POOR>"}
   ],
   "leverageRatios": [
     {"metric": "Debt/Equity", "value": "${debtEq}x", "threshold": "1.0x", "risk": "${Number(debtEq) > 1.5 ? 'HIGH' : Number(debtEq) > 0.8 ? 'MEDIUM' : 'LOW'}"}
   ],
   "riskFactors": [
-    {"risk": "Liquidity Risk", "severity": "${Number(currentRatio) < 1 ? 'HIGH' : Number(currentRatio) < 1.5 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "Analyze based on current ratio of ${currentRatio}. Provide specific sector context."},
-    {"risk": "Leverage Risk", "severity": "${Number(debtEq) > 1.5 ? 'HIGH' : Number(debtEq) > 0.8 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "Analyze based on debt-to-equity of ${debtEq}. Provide specific sector context."},
-    {"risk": "Valuation Risk", "severity": "${Number(pe) > 30 ? 'HIGH' : Number(pe) > 20 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "Analyze current P/E of ${pe}x vs sector. Provide specific context."}
+    {"risk": "Liquidity Risk", "severity": "${Number(currentRatio) < 1 ? 'HIGH' : Number(currentRatio) < 1.5 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "<analyze current ratio ${currentRatio} with sector context>"},
+    {"risk": "Leverage Risk", "severity": "${Number(debtEq) > 1.5 ? 'HIGH' : Number(debtEq) > 0.8 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "<analyze D/E of ${debtEq} with sector context>"},
+    {"risk": "Valuation Risk", "severity": "${Number(pe) > 30 ? 'HIGH' : Number(pe) > 20 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "<analyze P/E ${pe}x vs sector with context>"}
   ],
   "peerBenchmarks": [
-${buildPeerRows()}
+    {"ticker": "<peer1_ticker>", "name": "<peer1_company_name>", "pe": "<peer1_pe>x", "evEbitda": "<peer1_ev_ebitda>x", "margin": "<peer1_net_margin>%"},
+    {"ticker": "<peer2_ticker>", "name": "<peer2_company_name>", "pe": "<peer2_pe>x", "evEbitda": "<peer2_ev_ebitda>x", "margin": "<peer2_net_margin>%"},
+    {"ticker": "<peer3_ticker>", "name": "<peer3_company_name>", "pe": "<peer3_pe>x", "evEbitda": "<peer3_ev_ebitda>x", "margin": "<peer3_net_margin>%"}
   ]
 }`
   }
 }
-
 
 /**
  * ============================================================================
@@ -482,8 +511,8 @@ export async function POST(request) {
     )
   }
 
-  // Check AI keys
-  if (!process.env.CEREBRAS_API_KEY && !process.env.GROQ_API_KEY) {
+  // Check AI keys (NVIDIA primary, Groq fallback)
+  if (!process.env.NVIDIA_API_KEY && !process.env.GROQ_API_KEY) {
     return NextResponse.json(
       { success: false, error: 'Service temporarily unavailable' },
       { status: 503, headers }
@@ -499,6 +528,7 @@ export async function POST(request) {
       systemPrompt: prompt.system,
       userPrompt: prompt.user,
       modelConfig: { maxTokens: 4096, temperature: 0.1 },
+      analysisType: analysisType,
     })
 
     // 1. Strip markdown fences the AI may have added

@@ -16,6 +16,7 @@ import {
   calculateMarginOfSafety,
   calculateEBITDA,
   calculateNOPAT,
+  normalizeToAbsolute,
 } from '@/lib/financial-utils'
 
 const DCFContext = createContext(undefined)
@@ -45,8 +46,9 @@ export function DCFProvider({ children, rawApiData, stockData }) {
       1000000 // final fallback: 1M shares (better than 1)
 
     // ── Financial base metrics ────────────────────────────────────────────────
-    const baseRevenue = stockData?.revenue || d?.revenue || 1000000000
-    const baseEbitda = stockData?.ebitda || d?.ebitda || baseRevenue * 0.2
+    // Normalize all values to absolute numbers (handles "2.5B", "2500M", etc.)
+    const baseRevenue = normalizeToAbsolute(stockData?.revenue || d?.revenue) || 1000000000
+    const baseEbitda = normalizeToAbsolute(stockData?.ebitda || d?.ebitda) || baseRevenue * 0.2
 
     // ── DCF Assumptions from AI (with safe defaults) ─────────────────────────
     const wacc = d?.assumptions?.wacc || 10
@@ -118,10 +120,12 @@ export function DCFProvider({ children, rawApiData, stockData }) {
     const pvTerminalValue = calculatePVTerminalValue(terminalValue, wacc, 5)
     const enterpriseValue = calculateEnterpriseValue(pvFCFs, pvTerminalValue)
 
-    const totalCash = stockData?.totalCash || d?.totalCash || d?.assumptions?.cash || 0
-    const totalDebt = stockData?.totalDebt || d?.totalDebt || d?.assumptions?.debt || 0
+    // Normalize cash/debt to absolute numbers
+    const totalCash = normalizeToAbsolute(stockData?.totalCash || d?.totalCash || d?.assumptions?.cash)
+    const totalDebt = normalizeToAbsolute(stockData?.totalDebt || d?.totalDebt || d?.assumptions?.debt)
+    const marketCap = stockData?.marketCap || d?.marketCap || currentPrice * sharesOutstanding
 
-    const equityValue = calculateEquityValue(enterpriseValue, totalCash, totalDebt)
+    const equityValue = calculateEquityValue(enterpriseValue, totalCash, totalDebt, marketCap)
     const intrinsicValuePerShare = calculateIntrinsicValuePerShare(equityValue, sharesOutstanding)
 
     return {
