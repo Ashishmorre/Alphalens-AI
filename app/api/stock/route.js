@@ -157,6 +157,22 @@ export async function GET(request) {
       }
     }
 
+    // ─── Screener.in Peer & Ratio Data for Indian Equities ────────────────────
+    // fetchScreenerData was imported but never called — this is the fix for
+    // missing Peer Groups in Risk & Ratios analysis
+    if (isIndianTicker && isScreenerEligible(validation.ticker)) {
+      try {
+        const screenerResult = await fetchScreenerData(validation.ticker)
+        if (screenerResult) {
+          // mergeScreenerData attaches screenerPeers + fills gaps in Yahoo ratios
+          Object.assign(data, mergeScreenerData(data, screenerResult))
+        }
+      } catch (screenerError) {
+        // Graceful degradation — don't fail if Screener fetch fails
+        console.warn('Screener data fetch failed (graceful degradation):', screenerError.message)
+      }
+    }
+
     return NextResponse.json(
       { success: true, data, error: null },
       { status: 200, headers }

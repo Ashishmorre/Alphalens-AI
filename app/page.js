@@ -178,9 +178,9 @@ export default function Home() {
                       )}
                       {activeAnalysisTab === 'dcf' && (
                         <ErrorBoundary>
-                          <DCFProvider rawApiData={currentAnalysis}>
-                <DCFValuation currency={stockData.currency} />
-              </DCFProvider>
+                          <DCFProvider rawApiData={currentAnalysis} stockData={stockData}>
+                            <DCFValuation currency={stockData.currency} />
+                          </DCFProvider>
                         </ErrorBoundary>
                       )}
                       {activeAnalysisTab === 'risk' && (

@@ -108,84 +108,74 @@ ABSOLUTE REQUIREMENT: ALL NUMBERS MUST BE MATHEMATICALLY CONSISTENT AND LOGICALL
 
 function buildDCFPrompt(ticker, d) {
   const price = d.price?.toFixed?.(2) || 100
+  const shares = d.sharesOutstanding ? d.sharesOutstanding.toLocaleString() : 'calculate from market cap'
   return {
-    system: 'You are a Quantitative Financial Modeler. You MUST return ONLY a valid JSON object. Your internal math calculations must be flawless.',
-    user: `Build a 5-year DCF model for ${ticker}.
+    system: 'You are a Quantitative Financial Modeler. You MUST return ONLY a raw valid JSON object — no markdown, no backticks, no explanation. Your math must be internally consistent.',
+    user: `Build a 5-year DCF model for ${ticker} (${d.name || ticker}).
 
-CURRENT INPUT DATA (do not deviate from these base numbers):
-- Price: ${price} ${d.currency || 'USD'}
-- Revenue: ${fmtNumber(d.revenue)}
-- EBITDA: ${fmtNumber(d.ebitda)}
+INPUT DATA — use these exact figures as your base:
+- Current Price: ${price} ${d.currency || 'USD'}
+- Revenue (TTM): ${fmtNumber(d.revenue)}
+- EBITDA (TTM): ${fmtNumber(d.ebitda)}
 - Gross Margin: ${fmtPercent(d.grossMargin)}
 - Operating Margin: ${fmtPercent(d.operatingMargin)}
 - Total Debt: ${fmtNumber(d.totalDebt)}
-- Cash: ${fmtNumber(d.totalCash)}
-- Shares Outstanding: ${d.sharesOutstanding || 'estimate based on market cap'}
+- Cash & Equivalents: ${fmtNumber(d.totalCash)}
+- Shares Outstanding: ${shares}
+- Sector: ${d.sector || 'N/A'}
 
-CRITICAL MATH RULES - ANY VIOLATION RENDERS OUTPUT USELESS:
+MATH RULES (violations = unusable output):
+1. All revenue/FCF numbers MUST stay in the same magnitude as the input (if revenue is billions, keep billions).
+2. intrinsicValuePerShare = equityValue / sharesOutstanding
+3. equityValue = enterpriseValue + cash - debt
+4. marginOfSafety = ((intrinsicValuePerShare - ${price}) / intrinsicValuePerShare) * 100
+5. upside = ((intrinsicValuePerShare - ${price}) / ${price}) * 100
+6. dcfRating: "UNDERVALUED" if upside > 10%, "OVERVALUED" if upside < -10%, else "NEUTRAL"
+7. sensitivityTable.values MUST be a 5×5 matrix — 5 rows (one per tgrRange), 5 columns (one per waccRange)
 
-1. All projections MUST scale logically from the CURRENT DATA provided above.
-2. DO NOT jump magnitudes arbitrarily (e.g., if Revenue is in Billions, projections stay in Billions).
-3. intrinsicValuePerShare MUST logically correlate with enterpriseValue and outstanding shares.
-   Formula: equityValue = enterpriseValue + cash - debt; intrinsicValuePerShare = equityValue / sharesOutstanding
-4. marginOfSafety MUST be calculated as: ((intrinsicValuePerShare - ${price}) / intrinsicValuePerShare) * 100
-5. upside MUST be calculated as: ((intrinsicValuePerShare - ${price}) / ${price}) * 100
-6. dcfRating MUST be UNDERVALUED if intrinsic > current, OVERVALUED if intrinsic < current, NEUTRAL if within 10%
-7. If intrinsicValuePerShare = 125.50 and current = 399.35, then:
-   - upside = -68.5% (negative, because 125 < 399)
-   - dcfRating = OVERVALUED (red)
-   - This is NOT Undervalued with +22.6% upside - that is mathematically impossible
-
-Return a SINGLE VALID JSON OBJECT with this exact structure (numbers only):
+RETURN ONLY THIS JSON STRUCTURE — NO MARKDOWN — replace ALL values with real computed numbers for ${ticker}:
 {
   "assumptions": {
-    "wacc": 10.0,
-    "terminalGrowthRate": 2.5,
-    "taxRate": 21.0,
-    "revenueGrowthRates": [10.0, 9.5, 9.0, 8.5, 8.0],
-    "ebitdaMargins": [20.0, 21.0, 22.0, 23.0, 24.0]
+    "wacc": <computed_wacc_percent>,
+    "terminalGrowthRate": <computed_tgr_percent>,
+    "taxRate": <computed_tax_rate_percent>,
+    "revenueGrowthRates": [<yr1_pct>, <yr2_pct>, <yr3_pct>, <yr4_pct>, <yr5_pct>],
+    "ebitdaMargins": [<yr1_pct>, <yr2_pct>, <yr3_pct>, <yr4_pct>, <yr5_pct>]
   },
   "projections": [
-    {"year": 1, "revenue": 1000000000, "ebitda": 200000000, "ebit": 150000000, "nopat": 118500000, "capex": -50000000, "nwcChange": -10000000, "fcf": 58500000}
+    {"year": 1, "revenue": <real_num>, "ebitda": <real_num>, "ebit": <real_num>, "nopat": <real_num>, "capex": <negative_num>, "nwcChange": <real_num>, "fcf": <real_num>},
+    {"year": 2, "revenue": <real_num>, "ebitda": <real_num>, "ebit": <real_num>, "nopat": <real_num>, "capex": <negative_num>, "nwcChange": <real_num>, "fcf": <real_num>},
+    {"year": 3, "revenue": <real_num>, "ebitda": <real_num>, "ebit": <real_num>, "nopat": <real_num>, "capex": <negative_num>, "nwcChange": <real_num>, "fcf": <real_num>},
+    {"year": 4, "revenue": <real_num>, "ebitda": <real_num>, "ebit": <real_num>, "nopat": <real_num>, "capex": <negative_num>, "nwcChange": <real_num>, "fcf": <real_num>},
+    {"year": 5, "revenue": <real_num>, "ebitda": <real_num>, "ebit": <real_num>, "nopat": <real_num>, "capex": <negative_num>, "nwcChange": <real_num>, "fcf": <real_num>}
   ],
-  "pvFCFs": 280000000,
-  "terminalValue": 1500000000,
-  "pvTerminalValue": 950000000,
-  "enterpriseValue": 1230000000,
-  "equityValue": 1000000000,
-  "intrinsicValuePerShare": 125.50,
-  "marginOfSafety": 15.0,
-  "upside": -68.5,
-  "dcfRating": "OVERVALUED",
+  "pvFCFs": <real_num>,
+  "terminalValue": <real_num>,
+  "pvTerminalValue": <real_num>,
+  "enterpriseValue": <real_num>,
+  "equityValue": <real_num>,
+  "intrinsicValuePerShare": <real_per_share_price>,
+  "marginOfSafety": <real_pct>,
+  "upside": <real_pct>,
+  "dcfRating": "UNDERVALUED|NEUTRAL|OVERVALUED",
   "sensitivityTable": {
     "waccRange": [8.0, 9.0, 10.0, 11.0, 12.0],
     "tgrRange": [1.5, 2.0, 2.5, 3.0, 3.5],
     "values": [
-        [180, 165, 150, 138, 128],
-        [175, 160, 145, 134, 124],
-        [170, 155, 140, 130, 120],
-        [165, 150, 135, 125, 115],
-        [160, 145, 130, 120, 110]
-      ]
+      [<per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>],
+      [<per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>],
+      [<per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>],
+      [<per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>],
+      [<per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>]
+    ]
   },
-  "keyRisksToModel": ["Risk 1", "Risk 2"],
-  "analystNote": "Brief DCF methodology note"
+  "keyRisksToModel": ["<specific_risk_1_for_${ticker}>", "<specific_risk_2_for_${ticker}>", "<specific_risk_3_for_${ticker}>"],
+  "analystNote": "<2-3 sentence summary of this specific DCF model's key assumptions and confidence for ${ticker}>"
 }
 
-REQUIREMENTS:
-1. Return ONLY the JSON object, no markdown backticks
-2. Use realistic numbers based on ${ticker}'s financials
-3. All numeric values must be plain numbers (not strings)
-4. WACC in percentage points (e.g., 10.0 for 10%)
-5. 5 projection years exactly
-6. CRITICAL: Ensure ALL calculations are mathematically consistent
-7. CRITICAL: sensitivityTable.values MUST be a 5x5 matrix (5 arrays, each with 5 numbers) matching waccRange.length x tgrRange.length
-8. keyDrivers MUST have at least 2 items with meaningful driver names (not "Unknown")
-9. comparisonPeers must be real companies in the same sector as ${d.sector || 'the industry'}
-${d.screenerPeers?.length > 0 ? `
-10. CRITICAL: Use these EXACT Screener peers for comparisonPeers: ${d.screenerPeers.slice(0, 5).map(p => p.ticker || p.name).join(', ')}
-Do not hallucinate peers - only use the provided list.` : ''}
-11. NO HALLUCINATIONS: If you cannot determine a value, use null or 0, never invent`,
+CRITICAL: DO NOT copy the <placeholder> tags — replace every one with real computed values for ${ticker}.
+DO NOT use markdown fences. Return ONLY the JSON object.
+${d.screenerPeers?.length > 0 ? `\nPeer context for ${ticker}: ${d.screenerPeers.slice(0, 5).map(p => p.name || p.ticker).join(', ')}` : ''}`,
   }
 }
 
@@ -397,6 +387,19 @@ Return ONLY JSON matching this exact structure:
 }
 
 /**
+ * Strip markdown code fences from AI output before JSON parsing.
+ * Some models wrap JSON in ```json ... ``` blocks.
+ */
+function cleanAIResponse(raw) {
+  if (!raw || typeof raw !== 'string') return raw
+  // Remove leading/trailing whitespace
+  let cleaned = raw.trim()
+  // Strip ```json ... ``` or ``` ... ``` fences
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '')
+  return cleaned.trim()
+}
+
+/**
  * POST /api/analyze
  * Generate AI analysis for a stock
  */
@@ -472,14 +475,17 @@ export async function POST(request) {
       modelConfig: { maxTokens: 4096, temperature: 0.1 },
     })
 
-    // Parse JSON response with defensive fallback
+    // 1. Strip markdown fences the AI may have added
+    const cleanedResponse = cleanAIResponse(rawResponse)
+
+    // 2. Parse JSON with defensive fallback
     let analysisData
     try {
-      analysisData = safeParseJSON(rawResponse)
+      analysisData = safeParseJSON(cleanedResponse)
     } catch (parseError) {
-      console.error("RAW AI:", rawResponse)
-      // Try to extract JSON from markdown or text-wrapped response
-      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/)
+      console.error('RAW AI response:', rawResponse.slice(0, 500))
+      // Try to extract a JSON object from anywhere in the response
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         try {
           analysisData = safeParseJSON(jsonMatch[0])
