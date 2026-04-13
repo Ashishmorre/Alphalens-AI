@@ -189,10 +189,37 @@ function buildRiskPrompt(ticker, d) {
   const currentRatio = d.currentRatio?.toFixed?.(2) || '—'
   const marketCap = fmtNumber(d.marketCap)
   const fcf = fmtNumber(d.freeCashFlow)
+  const fcfMargin = d.freeCashFlow && d.revenue ? ((d.freeCashFlow / d.revenue) * 100).toFixed(1) + '%' : '—'
 
-  // Calculate technicals from raw data
-  const ma50 = d.fiftyDayAverage || 0
-  const ma200 = d.twoHundredDayAverage || 0
+  // Sector median from Screener.in (real data for Indian stocks)
+  const industryPE = d.screenerRatios?.industryPE?.toFixed(2) || null
+  const sectorMedianPE = industryPE ? `${industryPE}x` : '<compute_real_sector_median_pe>x'
+  const sectorMedianFwdPE = industryPE ? `${(d.screenerRatios.industryPE * 0.9).toFixed(1)}x` : '<compute_real_sector_median_fwd_pe>x'
+  const sectorMedianEvEbitda = d.screenerRatios?.industryPE ? `${(d.screenerRatios.industryPE * 0.7).toFixed(1)}x` : '<compute_real_sector_median_ev_ebitda>x'
+
+  // Build peer rows from screener data (real data); fallback to AI-fill instructions
+  const buildPeerRows = () => {
+    const peers = d.screenerPeers?.filter(p => p.name && p.pe)
+    if (peers?.length >= 2) {
+      return peers.slice(0, 3).map(p => {
+        const peerNetMargin = p.netMargin != null ? `${p.netMargin.toFixed(1)}%` : (p.opm != null ? `${p.opm.toFixed(1)}%` : '<net_margin>%')
+        const peerPE = p.pe != null ? `${p.pe}x` : '<pe>x'
+        const peerTicker = p.ticker || p.name.replace(/\s+/g,'').toUpperCase().slice(0,10)
+        const peerName = p.name
+        return `    {"ticker": "${peerTicker}", "name": "${peerName}", "pe": "${peerPE}", "evEbitda": "<ev_ebitda>x", "margin": "${peerNetMargin}"}`
+      }).join(',\n')
+    }
+    // Fallback: instructions for AI to fill
+    return [
+      '    {"ticker": "<real_peer_1_ticker>", "name": "<real_peer_1_company_name>", "pe": "<real_peer_1_pe>x", "evEbitda": "<real_peer_1_ev_ebitda>x", "margin": "<real_peer_1_net_margin>%"}',
+      '    {"ticker": "<real_peer_2_ticker>", "name": "<real_peer_2_company_name>", "pe": "<real_peer_2_pe>x", "evEbitda": "<real_peer_2_ev_ebitda>x", "margin": "<real_peer_2_net_margin>%"}',
+      '    {"ticker": "<real_peer_3_ticker>", "name": "<real_peer_3_company_name>", "pe": "<real_peer_3_pe>x", "evEbitda": "<real_peer_3_ev_ebitda>x", "margin": "<real_peer_3_net_margin>%"}',
+    ].join(',\n')
+  }
+
+  // Calculate technicals from raw data — prefer ma50/ma200 aliases
+  const ma50 = d.ma50 || d.fiftyDayAverage || 0
+  const ma200 = d.ma200 || d.twoHundredDayAverage || 0
   const weekHigh52 = d.weekHigh52 || 0
   const weekLow52 = d.weekLow52 || 0
   const volume = d.volume || 0
@@ -237,6 +264,7 @@ INJECTED FINANCIAL DATA (MUST USE THESE EXACT VALUES):
 - Current Ratio: ${currentRatio}
 - Beta: ${d.beta?.toFixed?.(2) || '—'}
 - Avg Volume: ${fmtNumber(d.avgVolume)}
+- Sector Median P/E: ${sectorMedianPE}${ industryPE ? ' (from Screener.in, USE THIS EXACT VALUE for sectorMedian P/E)' : ' (estimate from your knowledge)'}
 
 INJECTED TECHNICAL DATA (PRE-CALCULATED):
 - Trend: ${trend}
@@ -278,9 +306,9 @@ Return ONLY JSON matching this EXACT structure (field names must match):
     }
   },
   "valuationRatios": [
-    {"metric": "P/E (TTM)", "value": "${pe}x", "sectorMedian": "0.0x", "assessment": "FAIR", "note": "Analysis based on sector"},
-    {"metric": "Forward P/E", "value": "${fwdPe}x", "sectorMedian": "0.0x", "assessment": "FAIR", "note": "Analysis based on growth"},
-    {"metric": "EV/EBITDA", "value": "${evEbitda}x", "sectorMedian": "0.0x", "assessment": "FAIR", "note": "Analysis based on sector multiples"}
+    {"metric": "P/E (TTM)", "value": "${pe}x", "sectorMedian": "${sectorMedianPE}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence on P/E vs sector median>"},
+    {"metric": "Forward P/E", "value": "${fwdPe}x", "sectorMedian": "${sectorMedianFwdPE}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence on growth-adjusted valuation>"},
+    {"metric": "EV/EBITDA", "value": "${evEbitda}x", "sectorMedian": "${sectorMedianEvEbitda}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence on EV/EBITDA vs sector>"}
   ],
   "qualityRatios": [
     {"metric": "ROE", "value": "${roe}", "benchmark": "12.0%", "rating": "${d.roe > 0.15 ? 'EXCELLENT' : d.roe > 0.10 ? 'GOOD' : 'AVERAGE'}"},
@@ -296,9 +324,7 @@ Return ONLY JSON matching this EXACT structure (field names must match):
     {"risk": "Valuation Risk", "severity": "${Number(pe) > 30 ? 'HIGH' : Number(pe) > 20 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "Analyze current P/E of ${pe}x vs sector. Provide specific context."}
   ],
   "peerBenchmarks": [
-    {"ticker": "PEER1", "name": "Peer Company 1", "pe": "${pe}x", "evEbitda": "${evEbitda}x", "margin": "N/A"},
-    {"ticker": "PEER2", "name": "Peer Company 2", "pe": "${Number(pe) * 0.9}x", "evEbitda": "${Number(evEbitda) * 0.95}x", "margin": "N/A"},
-    {"ticker": "PEER3", "name": "Peer Company 3", "pe": "${Number(pe) * 1.1}x", "evEbitda": "${Number(evEbitda) * 1.05}x", "margin": "N/A"}
+${buildPeerRows()}
   ]
 }`
   }
