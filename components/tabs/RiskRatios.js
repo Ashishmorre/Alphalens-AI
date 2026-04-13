@@ -1,8 +1,10 @@
 'use client'
+import { getCurrencySymbol } from '@/lib/client-utils'
 
-export default function RiskRatios({ data }) {
+export default function RiskRatios({ data, currency }) {
   if (!data) return null
   const d = data
+  const currencySymbol = getCurrencySymbol(currency)
 
   return (
     <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -118,8 +120,8 @@ export default function RiskRatios({ data }) {
               { label: 'vs 50-Day MA', value: `${parseFloat(d.technicals.priceVs50DMA) >= 0 ? '+' : ''}${parseFloat(d.technicals.priceVs50DMA || 0).toFixed(1)}%`, positive: parseFloat(d.technicals.priceVs50DMA) >= 0 },
               { label: 'vs 200-Day MA', value: `${parseFloat(d.technicals.priceVs200DMA) >= 0 ? '+' : ''}${parseFloat(d.technicals.priceVs200DMA || 0).toFixed(1)}%`, positive: parseFloat(d.technicals.priceVs200DMA) >= 0 },
               { label: '52W Position', value: `${parseFloat(d.technicals.weekPosition52 || 0).toFixed(0)}%`, neutral: true },
-              { label: 'Support', value: d.technicals.keyLevels?.support ? `$${parseFloat(d.technicals.keyLevels.support).toFixed(2)}` : '—', neutral: true },
-              { label: 'Resistance', value: d.technicals.keyLevels?.resistance ? `$${parseFloat(d.technicals.keyLevels.resistance).toFixed(2)}` : '—', neutral: true },
+              { label: 'Support', value: d.technicals.keyLevels?.support ? `${currencySymbol}${parseFloat(d.technicals.keyLevels.support).toFixed(2)}` : '—', neutral: true },
+              { label: 'Resistance', value: d.technicals.keyLevels?.resistance ? `${currencySymbol}${parseFloat(d.technicals.keyLevels.resistance).toFixed(2)}` : '—', neutral: true },
             ].map(({ label, value, positive, neutral }) => (
               <div key={label} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.875rem', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div style={{ fontSize: '0.65rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.3rem' }}>{label}</div>

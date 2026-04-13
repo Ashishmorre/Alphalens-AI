@@ -86,8 +86,22 @@ export default function Home() {
 
   const handleTabChange = (tabId) => {
     setActiveAnalysisTab(tabId)
-    setAnalysisError('')
+    setAnalysisError('')   // BUG-D fix: clear stale error on tab change
   }
+
+  // BUG-E fix: force-retry clears cache entry first so the fetch isn't blocked
+  const handleRetry = useCallback(() => {
+    if (!stockData) return
+    const cacheKey = `${stockData.ticker}_${activeAnalysisTab}`
+    setAnalysisCache(prev => {
+      const next = { ...prev }
+      delete next[cacheKey]
+      return next
+    })
+    setAnalysisError('')
+    // Trigger run on next tick after state update
+    setTimeout(() => handleRunAnalysis(activeAnalysisTab), 0)
+  }, [stockData, activeAnalysisTab, handleRunAnalysis])
 
   const currentCacheKey = stockData ? `${stockData.ticker}_${activeAnalysisTab}` : null
   const currentAnalysis = currentCacheKey ? analysisCache[currentCacheKey] : null
@@ -185,7 +199,7 @@ export default function Home() {
                       )}
                       {activeAnalysisTab === 'risk' && (
                         <ErrorBoundary>
-                          <RiskRatios data={currentAnalysis} />
+                          <RiskRatios data={currentAnalysis} currency={stockData.currency} />
                         </ErrorBoundary>
                       )}
                       {activeAnalysisTab === 'news' && (
@@ -210,7 +224,7 @@ export default function Home() {
                       <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.82rem', color: '#f87171' }}>{analysisError}</span>
                       <button
                         className="btn btn-ghost"
-                        onClick={() => handleRunAnalysis(activeAnalysisTab)}
+                        onClick={handleRetry}
                         style={{ marginLeft: 'auto', fontSize: '0.78rem' }}
                       >
                         Retry

@@ -173,11 +173,4 @@ function SectionTitle({ children }) {
   return <div style={{ fontSize: '0.68rem', color: 'var(--txt-muted)', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'var(--font-dm-mono)', marginBottom: '0.75rem' }}>{children}</div>
 }
 
-function LegendItem({ color, text, textColor }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontFamily: 'var(--font-dm-mono)' }}>
-      <div style={{ width: '12px', height: '12px', background: color, borderRadius: '2px', flexShrink: 0 }} />
-      <span style={{ color: textColor }}>{text}</span>
-    </div>
-  )
-}
+
