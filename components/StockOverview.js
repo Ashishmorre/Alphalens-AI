@@ -1,10 +1,10 @@
 'use client'
-import { formatNumber, formatPrice, formatVolume, formatMultiple, formatPct, changeColor, changeSign, truncate, getExchangeFlag, getCurrencySymbol } from '@/lib/client-utils'
+import { formatNumber, formatPrice, formatVolume, formatMultiple, formatPct, changeSign, truncate, getExchangeFlag } from '@/lib/client-utils'
 
 export default function StockOverview({ data, onCompare }) {
   if (!data) return null
   const isPositive = data.change >= 0
-  const changeColor = isPositive ? '#22c55e' : '#ef4444'
+  const priceChangeColor = isPositive ? '#22c55e' : '#ef4444'
   const pricePctOf52W = data.weekHigh52 && data.weekLow52
     ? ((data.price - data.weekLow52) / (data.weekHigh52 - data.weekLow52)) * 100
     : null
@@ -41,10 +41,10 @@ export default function StockOverview({ data, onCompare }) {
                 {formatPrice(data.price, data.currency)}
               </span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.1rem', color: changeColor, fontWeight: 500 }}>
+                <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '1.1rem', color: priceChangeColor, fontWeight: 500 }}>
                   {changeSign(data.change)}{formatPrice(Math.abs(data.change), data.currency)}
                 </span>
-                <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.9rem', color: changeColor }}>
+                <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.9rem', color: priceChangeColor }}>
                   {changeSign(data.changePercent)}{data.changePercent?.toFixed(2)}%
                 </span>
               </div>

@@ -60,36 +60,40 @@ export default function Home() {
   }, [])
 
   // ─── Run AI analysis ────────────────────────────────────────────────────────
-  const handleRunAnalysis = useCallback(async (type) => {
+  // doFetch: the actual API call, shared by both normal runs and forced retries
+  const doFetch = useCallback(async (type) => {
     if (!stockData) return
     const cacheKey = `${stockData.ticker}_${type}`
-    if (analysisCache[cacheKey]) return
-
     setAnalysisLoading(true)
     setAnalysisError('')
-
     try {
       const data = await apiPost('/api/analyze', {
         ticker: stockData.ticker,
         analysisType: type,
         stockData,
       })
-    // Normalize AI response to handle inconsistent formats
-    const normalizedData = normalizeAIResponse(data, type)
+      const normalizedData = normalizeAIResponse(data, type)
       setAnalysisCache(prev => ({ ...prev, [cacheKey]: normalizedData }))
     } catch (err) {
       setAnalysisError(getErrorMessage(err))
     } finally {
       setAnalysisLoading(false)
     }
-  }, [stockData, analysisCache])
+  }, [stockData])
+
+  const handleRunAnalysis = useCallback(async (type) => {
+    if (!stockData) return
+    const cacheKey = `${stockData.ticker}_${type}`
+    if (analysisCache[cacheKey]) return  // already cached — skip
+    return doFetch(type)
+  }, [stockData, analysisCache, doFetch])
 
   const handleTabChange = (tabId) => {
     setActiveAnalysisTab(tabId)
-    setAnalysisError('')   // BUG-D fix: clear stale error on tab change
+    setAnalysisError('')   // clear stale error on tab change
   }
 
-  // BUG-E fix: force-retry clears cache entry first so the fetch isn't blocked
+  // handleRetry calls doFetch directly — bypasses cache check (stale closure safe)
   const handleRetry = useCallback(() => {
     if (!stockData) return
     const cacheKey = `${stockData.ticker}_${activeAnalysisTab}`
@@ -99,9 +103,8 @@ export default function Home() {
       return next
     })
     setAnalysisError('')
-    // Trigger run on next tick after state update
-    setTimeout(() => handleRunAnalysis(activeAnalysisTab), 0)
-  }, [stockData, activeAnalysisTab, handleRunAnalysis])
+    doFetch(activeAnalysisTab)
+  }, [stockData, activeAnalysisTab, doFetch])
 
   const currentCacheKey = stockData ? `${stockData.ticker}_${activeAnalysisTab}` : null
   const currentAnalysis = currentCacheKey ? analysisCache[currentCacheKey] : null
