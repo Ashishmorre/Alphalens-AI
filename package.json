@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate --schema=./lib/db/prisma/schema.prisma && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "postinstall": "prisma generate --schema=./lib/db/prisma/schema.prisma"
   },
   "dependencies": {
     "@upstash/ratelimit": "^2.0.8",
