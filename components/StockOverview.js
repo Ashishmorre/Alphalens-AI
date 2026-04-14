@@ -102,7 +102,7 @@ export default function StockOverview({ data, onCompare }) {
           { label: `FCF (FY${data._fcfPeriod || 'TTM'})`, value: formatNumber(data.freeCashFlow, 2, data.currency) },
           { label: 'Gross Margin', value: formatPct(data.grossMargin) },
           { label: 'Net Margin', value: formatPct(data.profitMargin) },
-          { label: 'ROE', value: formatPct(data.roe) },
+          { label: `ROE${data._dataSources?.roe ? ` (${data._dataSources.roe})` : ''}`, value: data.roe != null ? formatPct(data.roe) : `—${data._debug?.hasNetIncome !== false ? '(no data)' : ''}` },
           { label: 'D/E Ratio', value: formatMultiple(data.debtToEquity) },
           { label: 'Analyst Target', value: formatPrice(data.targetMeanPrice, data.currency) },
         ].map(({ label, value }) => (
