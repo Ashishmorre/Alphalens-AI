@@ -151,9 +151,53 @@ MATH RULES (violations = unusable output):
 11. UPSIDE: upside = ((intrinsicValuePerShare - ${price}) / ${price}) * 100.
 12. DCF RATING: "UNDERVALUED" if upside > 10%, "OVERVALUED" if upside < -10%, else "NEUTRAL".
 
+13. MARKET-AWARE GROWTH CALIBRATION (INSTITUTIONAL MODELING):
+    - Base Terminal Growth Rate on P/E ratio and sector tailwinds, NOT textbook 2.5% conservatism:
+      * If P/E > 20x and sector has tailwinds (renewables, infrastructure, tech growth): TGR = 3.5-5.0%
+      * If P/E 15-20x and stable sector: TGR = 2.5-3.5%
+      * If P/E < 15x or declining sector: TGR = 1.5-2.5%
+    - Apply Capex-Driven Growth Ramp: Years 1-2 use conservative growth, Years 3-5 ramp higher to reflect capex converting to revenue
+    - Example: Tata Power (P/E ~25x, renewable infrastructure boom): Model TGR = 4.0-5.0%, not 2.8%
+
+14. GAP THRESHOLD SANITY CHECK (BULL MARKET ADJUSTMENT):
+    - If your calculated intrinsic value is >30% BELOW the institutional consensus target price, REVIEW your assumptions:
+      * Is WACC too high for the sector risk profile?
+      * Is Terminal Growth too conservative given P/E and sector momentum?
+      * Are you penalizing growth capex instead of crediting it?
+    - Textbook math often underprices bull market stocks - adjust growth assumptions to reflect market realism
+
+15. REALISTIC INTRINSIC VALUE TARGETING:
+    - Compare your output to known institutional targets (e.g., Alpha Spread, analyst consensus)
+    - If gap >30%, iterate on WACC and TGR until target aligns within 10-15%
+    - Final intrinsic value should reflect: Current Price × (1 + Market-Implied Growth Rate), not pure textbook DCF
+
+16. GROWTH J-CURVE MODELING (CAPEX PAYOFF STRUCTURE):
+    - Model the J-Curve where heavy CapEx in Years 1-2 creates negative/weak FCF initially
+    - FCF breaks positive in Year 3 as capex converts to revenue
+    - Years 4-5 show accelerated FCF growth as infrastructure becomes productive
+    - Formula: Year 1-2 Growth = TGR × 0.5, Year 3 = TGR × 1.0, Year 4 = TGR × 1.5, Year 5 = TGR × 1.8
+    - Example Tata Power: Year 1-2 (capex heavy, FCF flat), Year 3-5 (renewable capacity online, FCF +25-30% annually)
+    - This captures the "heavy investment now, massive payoff later" dynamic
+
+17. DYNAMIC WACC CALCULATION:
+    - Calculate WACC based on risk profile, NOT hardcoded 10%:
+    - Base: Risk-Free Rate + (Beta × Market Risk Premium)
+    - Adjust: Lower WACC for utilities (8.0-8.5%), higher for cyclical stocks (10-11%)
+    - Use provided Beta from input data
+    - Example Tata Power (Utility, Beta ~0.8): WACC = 4.5% + (0.8 × 5.5%) = 8.9%, rounded to 8.5%
+
+18. TERMINAL YEAR CAPEX CONVERGENCE (INSTITUTIONAL BEST PRACTICE):
+    - In the terminal year (Year 5), CapEx should converge toward Depreciation as company reaches steady-state
+    - This prevents valuation decay in the Gordon Growth Model
+    - Formula: convergedCapEx = baseTerminalCapEx × (1 - convergenceFactor) + Depreciation × convergenceFactor
+    - Where convergenceFactor = 0.9 (90% convergence to parity)
+    - Example: If Year 5 Depreciation = 500M, base CapEx = 750M, convergedCapEx = 750 × 0.1 + 500 × 0.9 = 525M
+    - CapEx MUST be negative in FCF calculation: Year 5 CapEx = -(convergedCapEx)
+    - This ensures Terminal Value reflects maintenance CapEx ≈ Depreciation, not growth CapEx
+
 SENSITIVITY ANALYSIS (MUST OUTPUT 5×5 MATRIX with rowHeaders/waccRange and colHeaders/tgrRange):
-- Base: wacc = computed WACC percent (e.g., 10), tgr = computed Terminal Growth Rate (e.g., 2.5)
-- rowHeaders (WACC values): MUST be [8.0, 9.0, 10.0, 11.0, 12.0] (5 values)
+- Base: wacc = computed WACC percent (e.g., 8.5), tgr = computed Terminal Growth Rate (e.g., 4.5)
+- rowHeaders (WACC values): MUST be [7.0, 8.0, 9.0, 10.0, 11.0] (5 values)
 - colHeaders (Terminal Growth values): MUST be [1.5, 2.0, 2.5, 3.0, 3.5] (5 values)
 - DCF MATH PROTOCOL per cell:
   1. Forecast FCF for 5 years using base assumptions
@@ -553,8 +597,19 @@ export async function POST(request) {
       }
     }
 
+    // Normalize field names for frontend consistency
+    // Maps various API formats to standard fields expected by components
+    const normalizedData = {
+      ...analysisData,
+      // Ensure P/E TTM is available as both 'pe' and 'peTTM'
+      pe: analysisData?.pe ?? analysisData?.peTTM ?? analysisData?.pe_ttm ?? analysisData?.trailingPE ?? null,
+      peTTM: analysisData?.peTTM ?? analysisData?.pe_ttm ?? analysisData?.pe ?? analysisData?.trailingPE ?? null,
+      // Ensure marketCap is normalized (handles various naming conventions)
+      marketCap: analysisData?.marketCap ?? analysisData?.market_cap ?? analysisData?.marketCapitalization ?? null,
+    }
+
     return NextResponse.json(
-      { success: true, data: analysisData, error: null },
+      { success: true, data: normalizedData, error: null },
       { status: 200, headers }
     )
 

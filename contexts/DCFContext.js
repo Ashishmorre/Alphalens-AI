@@ -17,6 +17,10 @@ import {
   calculateEBITDA,
   calculateNOPAT,
   normalizeToAbsolute,
+  calculateDynamicWACC,
+  calculateDynamicCapEx,
+  calculateGrowthJCurve,
+  calculateTerminalCapEx,
 } from '@/lib/financial-utils'
 
 const DCFContext = createContext(undefined)
@@ -50,9 +54,33 @@ export function DCFProvider({ children, rawApiData, stockData }) {
     const baseRevenue = normalizeToAbsolute(stockData?.revenue || d?.revenue) || 1000000000
     const baseEbitda = normalizeToAbsolute(stockData?.ebitda || d?.ebitda) || baseRevenue * 0.2
 
-    // ── DCF Assumptions from AI (with safe defaults) ─────────────────────────
-    const wacc = d?.assumptions?.wacc || 10
-    const terminalGrowthRate = d?.assumptions?.terminalGrowthRate || 2.5
+    // ── DCF Assumptions (Dynamic Assumption Engine) ─────────────────────────
+    // Calculate dynamic WACC based on stock risk profile (not hardcoded 10%)
+    const dynamicWACC = calculateDynamicWACC({
+      beta: stockData?.beta || d?.beta || 1.0,
+      pe: stockData?.pe || d?.pe,
+      sector: stockData?.sector || d?.sector,
+      baseRate: 4.5 // Risk-free rate
+    })
+
+    // Terminal Growth Rate: Market-aligned (not hardcoded 2.5%)
+    // Higher P/E + sector tailwinds = higher TGR
+    const basePE = stockData?.pe || d?.pe || 15
+    let dynamicTGR = 2.5
+    if (basePE > 30) dynamicTGR = 5.5
+    else if (basePE > 25) dynamicTGR = 4.5
+    else if (basePE > 20) dynamicTGR = 3.5
+    else if (basePE > 15) dynamicTGR = 3.0
+    else dynamicTGR = 2.0
+
+    // Sector premium for utilities and renewables
+    const sector = (stockData?.sector || d?.sector || '').toLowerCase()
+    if (sector.includes('utility') || sector.includes('renewable')) {
+      dynamicTGR = Math.min(6.0, dynamicTGR + 0.5) // Infrastructure tailwind
+    }
+
+    const wacc = d?.assumptions?.wacc || dynamicWACC
+    const terminalGrowthRate = d?.assumptions?.terminalGrowthRate || dynamicTGR
     const taxRate = d?.assumptions?.taxRate || 21
 
     // ── Revenue growth rates: use AI-provided or default ─────────────────────
@@ -90,22 +118,65 @@ export function DCFProvider({ children, rawApiData, stockData }) {
         pvFCF: calculatePV(p.fcf || 0, wacc, p.year || i + 1),
       }))
     } else {
-      // Recompute from scratch using assumptions
+      // Recompute from scratch using Dynamic Assumption Engine
       calculatedProjections = []
+
+      // Calculate dynamic CapEx % based on growth stage and sector
+      const revenueGrowth0 = revenueGrowthRates[0] || 10
+      const capexRate = calculateDynamicCapEx({
+        revenueGrowth: revenueGrowth0,
+        sector: stockData?.sector || d?.sector,
+        capexIntensity: stockData?.capexToRevenue || d?.capexToRevenue
+      })
+
+      // Get J-Curve multipliers for growth ramp
+      // J-Curve applies to Revenue, EBITDA margins, AND FCF to capture Operating Leverage
+      const baseFCF = baseEbitda * 0.6
+      const { fcfMultipliers, revenueGrowthMultipliers, ebitdaMarginMultipliers } = calculateGrowthJCurve({
+        baseFCF,
+        growthRate: terminalGrowthRate,
+        efficiencyMultiplier: 1.5 // Early CapEx pays off 1.5x in later years
+      })
+
       for (let i = 0; i < 5; i++) {
         const year = i + 1
-        const growthRate = revenueGrowthRates[i] || 10
-        const ebitdaMargin = ebitdaMargins[i] || 20
+        const baseGrowthRate = revenueGrowthRates[i] || 10
+        const baseEbitdaMargin = ebitdaMargins[i] || 20
 
-        const revenue = baseRevenue * Math.pow(1 + growthRate / 100, year)
-        const ebitda = calculateEBITDA(revenue, ebitdaMargin)
+        // Apply J-Curve: Conservative start for revenue growth, accelerating later
+        const jCurveGrowthRate = baseGrowthRate * revenueGrowthMultipliers[i]
+        // Apply J-Curve: EBITDA margins improve as operating leverage kicks in
+        const jCurveEbitdaMargin = baseEbitdaMargin * ebitdaMarginMultipliers[i]
+
+        const revenue = baseRevenue * Math.pow(1 + jCurveGrowthRate / 100, year)
+        const ebitda = calculateEBITDA(revenue, jCurveEbitdaMargin)
         const depreciation = ebitda * 0.12
         const ebit = ebitda - depreciation
         const nopat = calculateNOPAT(ebit, taxRate)
-        const capex = -revenue * 0.08
+
+        // Dynamic CapEx: higher in early years (J-curve investment), lower later
+        const capexAdjustment = i < 2 ? 1.3 : (i === 2 ? 1.0 : 0.8)
+        let capex = revenue * capexRate * capexAdjustment
+
         const prevRevenue = i === 0 ? baseRevenue : calculatedProjections[i - 1].revenue
         const nwcChange = (revenue - prevRevenue) * 0.03
-        const fcf = calculateFCF(nopat, depreciation, capex, nwcChange)
+
+        // Terminal Year CapEx Convergence: In steady state, CapEx ≈ Depreciation
+        // This prevents valuation decay - institutional best practice
+        if (i === 4) {
+          const baseTerminalCapEx = Math.abs(capex)
+          const convergedCapEx = calculateTerminalCapEx(
+            depreciation,
+            baseTerminalCapEx,
+            0.9 // convergence factor
+          )
+          capex = -convergedCapEx
+        }
+
+        // Calculate base FCF and apply J-curve growth multiplier
+        const baseFcfYear = calculateFCF(nopat, depreciation, capex, nwcChange)
+        const fcf = baseFcfYear * fcfMultipliers[i]
+
         const pvFCF = calculatePV(fcf, wacc, year)
 
         calculatedProjections.push({ year, revenue, ebitda, ebit, nopat, capex, nwcChange, fcf, pvFCF })
@@ -113,18 +184,22 @@ export function DCFProvider({ children, rawApiData, stockData }) {
     }
 
     // ── Valuation math ────────────────────────────────────────────────────────
+    // STRICT ANCHOR LOGIC: Always derive from calculated base, never trust AI-derived values
     const pvFCFs = calculatedProjections.reduce((sum, p) => sum + (p.pvFCF || 0), 0)
     const finalFCF = calculatedProjections[calculatedProjections.length - 1]?.fcf || 0
 
+    // ANCHOR 1: Calculate Enterprise Value from scratch using PV of FCFs + PV of Terminal Value
     const terminalValue = calculateTerminalValue(finalFCF, wacc, terminalGrowthRate)
     const pvTerminalValue = calculatePVTerminalValue(terminalValue, wacc, 5)
     const enterpriseValue = calculateEnterpriseValue(pvFCFs, pvTerminalValue)
 
-    // Normalize cash/debt to absolute numbers
+    // ANCHOR 2: Normalize cash/debt to absolute numbers (handles "2.5B", "2500M", etc.)
     const totalCash = normalizeToAbsolute(stockData?.totalCash || d?.totalCash || d?.assumptions?.cash)
     const totalDebt = normalizeToAbsolute(stockData?.totalDebt || d?.totalDebt || d?.assumptions?.debt)
     const marketCap = stockData?.marketCap || d?.marketCap || currentPrice * sharesOutstanding
 
+    // ANCHOR 3: ALWAYS re-derive equityValue from enterpriseValue anchor
+    // NEVER use d.equityValue from AI (it may be incorrect)
     const equityValue = calculateEquityValue(enterpriseValue, totalCash, totalDebt, marketCap)
     const intrinsicValuePerShare = calculateIntrinsicValuePerShare(equityValue, sharesOutstanding)
 
@@ -198,17 +273,21 @@ export function DCFProvider({ children, rawApiData, stockData }) {
     )
 
     // Merge: spread originalData first so our computed values always override
+    // STRICT ANCHOR: Explicitly exclude raw AI-derived values that should be recalculated
+    // This prevents accidentally using d.equityValue, d.enterpriseValue from AI if present
+    const { enterpriseValue: _rawEV, equityValue: _rawEqV, intrinsicValuePerShare: _rawIV, ...safeOriginalData } = safeData.originalData || {}
+
     return {
-      ...safeData.originalData,
+      ...safeOriginalData,
       currentPrice,
       assumptions,
       projections: calculatedProjections,
       pvFCFs,
       terminalValue,
       pvTerminalValue,
-      enterpriseValue,
-      equityValue,
-      intrinsicValuePerShare,
+      enterpriseValue,        // ANCHOR: Our calculated value (not AI's)
+      equityValue,              // ANCHOR: Our calculated value (not AI's)
+      intrinsicValuePerShare,   // ANCHOR: Our calculated value (not AI's)
       totalCash,
       totalDebt,
       upside,
