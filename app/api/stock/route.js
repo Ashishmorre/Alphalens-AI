@@ -25,7 +25,7 @@ const RATE_LIMIT = RATE_LIMIT_PRESETS.stockData
 
 /**
  * GET /api/stock?ticker={ticker}
- * Fetch stock data from Yahoo Finance
+ * Fetch stock data from Yahoo Finance with NSE XBRL fallback for Indian equities
  */
 export async function GET(request) {
   // Security check
@@ -77,30 +77,24 @@ export async function GET(request) {
     })
 
     // ─── NSE XBRL Fallback for Indian Equities ─────────────────────────────
-    // If Yahoo Finance returns null for key ratios on .NS/.BO tickers,
-    // fetch audited data from NSE Corporate Filings and calculate ratios
     const isIndianTicker = validation.ticker.endsWith('.NS') || validation.ticker.endsWith('.BO')
 
     if (isIndianTicker) {
-      const needsDebtToEquity = data.debtToEquity === null || data.debtToEquity === undefined || data.debtToEquity === 0
-      const needsROE = data.roe === null || data.roe === undefined || data.roe === 0
-      const needsCurrentRatio = data.currentRatio === null || data.currentRatio === undefined || data.currentRatio === 0
-      const needsPriceToBook = data.priceToBook === null || data.priceToBook === undefined || data.priceToBook === 0
+      const needsDebtToEquity = data.debtToEquity === null || data.debtToEquity === undefined
+      const needsROE = data.roe === null || data.roe === undefined
+      const needsCurrentRatio = data.currentRatio === null || data.currentRatio === undefined
+      const needsPriceToBook = data.priceToBook === null || data.priceToBook === undefined
 
       if (needsDebtToEquity || needsROE || needsCurrentRatio || needsPriceToBook) {
         try {
-          // Construct NSE corporate filings URL
           const nseSymbol = validation.ticker.replace('.NS', '').replace('.BO', '')
           const nseUrl = `https://www.nseindia.com/api/company-filings?symbol=${nseSymbol}&filingType=xbrl`
-
-          // Fetch XBRL data with session management
           const xbrlXml = await fetchNSEData(nseUrl)
 
           if (xbrlXml) {
             const xbrlMetrics = parseIndASXBRL(xbrlXml)
 
             if (!xbrlMetrics.error) {
-              // Calculate ratios from XBRL using professional-grade math
               const marketData = {
                 currentPrice: data.price || 0,
                 sharesOutstanding: data.sharesOutstanding || 0,
@@ -109,12 +103,21 @@ export async function GET(request) {
 
               const calculatedRatios = calculateRatiosFromXBRL(xbrlMetrics, marketData)
 
-              // Patch missing ratios with XBRL-derived values
+              // DEBUG: Log XBRL metrics
+              console.log(`[NSE XBRL Debug] ${validation.ticker}:`, {
+                hasNetIncome: !!xbrlMetrics.netIncome,
+                hasTotalEquity: !!xbrlMetrics.totalEquity,
+                netIncome: xbrlMetrics.netIncome,
+                totalEquity: xbrlMetrics.totalEquity,
+                calculatedROE: calculatedRatios.roe,
+              })
+
               if (needsDebtToEquity && calculatedRatios.debtToEquity !== null) {
                 data.debtToEquity = calculatedRatios.debtToEquity
               }
               if (needsROE && calculatedRatios.roe !== null) {
-                data.roe = calculatedRatios.roe / 100 // Convert from percentage to decimal
+                data.roe = calculatedRatios.roe / 100
+                console.log(`[NSE XBRL] ${validation.ticker}: ROE set to ${data.roe}`)
               }
               if (needsCurrentRatio && calculatedRatios.currentRatio !== null) {
                 data.currentRatio = calculatedRatios.currentRatio
@@ -122,11 +125,8 @@ export async function GET(request) {
               if (needsPriceToBook && calculatedRatios.priceToBook !== null) {
                 data.priceToBook = calculatedRatios.priceToBook
               }
-              if (!data.bookValuePerShare && calculatedRatios.bookValuePerShare !== null) {
-                data.bookValuePerShare = calculatedRatios.bookValuePerShare
-              }
 
-              // Fill in raw XBRL-derived metrics if missing
+              // Fill raw XBRL metrics
               if (!data.revenue && xbrlMetrics.revenueFromOperations) {
                 data.revenue = xbrlMetrics.revenueFromOperations
               }
@@ -136,8 +136,10 @@ export async function GET(request) {
               if (!data.totalEquity && xbrlMetrics.totalEquity) {
                 data.totalEquity = xbrlMetrics.totalEquity
               }
+              if (!data.netIncome && xbrlMetrics.netIncome) {
+                data.netIncome = xbrlMetrics.netIncome
+              }
 
-              // Mark data as XBRL-enhanced for UI transparency and AI context
               data._xbrlEnhanced = true
               data._xbrlMetrics = {
                 totalEquity: xbrlMetrics.totalEquity,
@@ -151,54 +153,53 @@ export async function GET(request) {
             }
           }
         } catch (nseError) {
-          // Graceful degradation — don't fail the request if NSE fetch fails
-          console.warn('NSE XBRL fetch failed (graceful degradation):', nseError.message)
+          console.warn('NSE XBRL fetch failed:', nseError.message)
           data._xbrlError = nseError.message
         }
       }
     }
 
-    // ─── Screener.in Peer & Ratio Data for Indian Equities ────────────────────
-    // fetchScreenerData was imported but never called — this is the fix for
-    // missing Peer Groups in Risk & Ratios analysis
+    // ─── Screener.in Peer & Ratio Data ─────────────────────────────────────
     if (isIndianTicker && isScreenerEligible(validation.ticker)) {
       try {
         const screenerResult = await fetchScreenerData(validation.ticker)
         if (screenerResult) {
-          // mergeScreenerData attaches screenerPeers + fills gaps in Yahoo ratios
           Object.assign(data, mergeScreenerData(data, screenerResult))
         }
       } catch (screenerError) {
-        // Graceful degradation — don't fail if Screener fetch fails
-        console.warn('Screener data fetch failed (graceful degradation):', screenerError.message)
+        console.warn('Screener data fetch failed:', screenerError.message)
       }
     }
 
-    // ─── TradingView Fallback (4th source) ─────────────────────────────────
-    // Fills any remaining null fields using Playwright-scraped TradingView data.
-    // Runs ONLY if critical fields are still missing after Yahoo + XBRL + Screener.
-    // Skipped when Screener already covered all ratios (avoids unnecessary 45s scrape).
+    // ─── TradingView Fallback ────────────────────────────────────────────
     const missingCritical = [
       data.pe, data.priceToBook, data.debtToEquity,
       data.roe, data.currentRatio, data.evToEbitda,
-    ].filter(v => v === null || v === undefined || v === 0).length
+    ].filter(v => v === null || v === undefined).length
 
     if (missingCritical >= 2) {
       try {
         const tv = tickerToTradingView(validation.ticker)
         if (tv) {
-          // Hard 20-second limit — Playwright is slow; degrade gracefully if timeout
           const tvTimeout = new Promise(resolve => setTimeout(() => resolve(null), 20000))
-          const tvFetch   = fetchTradingViewData(tv.exchange, tv.symbol)
-          const tvData    = await Promise.race([tvFetch, tvTimeout])
+          const tvFetch = fetchTradingViewData(tv.exchange, tv.symbol)
+          const tvData = await Promise.race([tvFetch, tvTimeout])
           if (tvData) {
             Object.assign(data, mergeTradingViewData(data, tvData))
           }
         }
       } catch (tvError) {
-        // Graceful degradation — TradingView scraping is best-effort
-        console.warn('TradingView data fetch failed (graceful degradation):', tvError.message)
+        console.warn('TradingView data fetch failed:', tvError.message)
       }
+    }
+
+    // ─── Final ROE Calculation Fallback ──────────────────────────────────
+    // If ROE is still missing but we have netIncome and totalEquity, calculate it
+    if ((data.roe === null || data.roe === undefined) && data.netIncome && data.totalEquity && data.totalEquity > 0) {
+      data.roe = data.netIncome / data.totalEquity
+      console.log(`[ROE Final Fallback] ${validation.ticker}: ROE = ${data.netIncome} / ${data.totalEquity} = ${data.roe}`)
+      if (!data._dataSources) data._dataSources = {}
+      data._dataSources.roe = 'calculated_from_equity'
     }
 
     return NextResponse.json(
@@ -209,7 +210,6 @@ export async function GET(request) {
   } catch (error) {
     logError('stock', error, { url: request.url })
 
-    // Specific error handling
     if (error.message?.includes('Rate limit')) {
       return NextResponse.json(
         { success: false, error: 'Rate limit exceeded. Please try again later.' },
