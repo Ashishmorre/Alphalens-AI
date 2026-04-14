@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { strictValidateTicker } from '@/lib/security'
 
 function formatNum(n, sym = '$') {
-  if (n == null || isNaN(n)) return '—'
+  if (n === null || n === undefined || Number.isNaN(n)) return '—'
   if (Math.abs(n) >= 1e12) return sym + (n / 1e12).toFixed(2) + 'T'
   if (Math.abs(n) >= 1e9) return sym + (n / 1e9).toFixed(2) + 'B'
   if (Math.abs(n) >= 1e6) return sym + (n / 1e6).toFixed(2) + 'M'
@@ -111,7 +111,7 @@ export default function ExportPDF({ stockData, analysisData, activeTab }) {
         ['Market Cap', formatNum(stockData.marketCap, sym)],
         ['P/E (TTM)', stockData.pe?.toFixed(1) || '—'],
         ['EV/EBITDA', stockData.evToEbitda?.toFixed(1) || '—'],
-        ['ROE', stockData.roe ? (stockData.roe * 100).toFixed(1) + '%' : '—'],
+        ['ROE', (stockData.roe !== null && stockData.roe !== undefined && !Number.isNaN(stockData.roe)) ? (stockData.roe * 100).toFixed(1) + '%' : '—'],
         ['Net Margin', stockData.profitMargin ? (stockData.profitMargin * 100).toFixed(1) + '%' : '—'],
         ['Revenue', formatNum(stockData.revenue, sym)],
         ['FCF', formatNum(stockData.freeCashFlow, sym)],
