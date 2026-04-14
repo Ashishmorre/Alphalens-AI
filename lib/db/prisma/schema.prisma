@@ -165,7 +165,7 @@ model Valuation {
 
   // Relationships
   projections       Projection[]
-  assumptions       Json?    // Full assumptions object
+  assumptions       String?    // Full assumptions object
 
   @@index([ticker, date])
   @@index([date])
