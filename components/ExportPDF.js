@@ -114,7 +114,7 @@ export default function ExportPDF({ stockData, analysisData, activeTab }) {
         ['ROE', (stockData.roe !== null && stockData.roe !== undefined && !Number.isNaN(stockData.roe)) ? (stockData.roe * 100).toFixed(1) + '%' : '—'],
         ['Net Margin', stockData.profitMargin ? (stockData.profitMargin * 100).toFixed(1) + '%' : '—'],
         ['Revenue', formatNum(stockData.revenue, sym)],
-        ['FCF', formatNum(stockData.freeCashFlow, sym)],
+        ['FCF (FY${stockData._fcfPeriod || 'TTM'})', formatNum(stockData.freeCashFlow, sym)],
         ['Beta', stockData.beta?.toFixed(2) || '—'],
       ]
 

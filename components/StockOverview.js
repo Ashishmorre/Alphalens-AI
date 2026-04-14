@@ -99,7 +99,7 @@ export default function StockOverview({ data, onCompare }) {
         {[
           { label: 'Revenue', value: formatNumber(data.revenue, 2, data.currency) },
           { label: 'EBITDA', value: formatNumber(data.ebitda, 2, data.currency) },
-          { label: 'Free Cash Flow', value: formatNumber(data.freeCashFlow, 2, data.currency) },
+          { label: `FCF (FY${data._fcfPeriod || 'TTM'})`, value: formatNumber(data.freeCashFlow, 2, data.currency) },
           { label: 'Gross Margin', value: formatPct(data.grossMargin) },
           { label: 'Net Margin', value: formatPct(data.profitMargin) },
           { label: 'ROE', value: formatPct(data.roe) },
