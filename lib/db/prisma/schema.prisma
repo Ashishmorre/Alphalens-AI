@@ -1,0 +1,278 @@
+// Production-Grade Database Schema for DCF Valuation System
+// Supports: Historical data, valuation tracking, prediction vs reality analysis
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Stock {
+  id          String   @id @default(cuid())
+  ticker      String   @unique
+  name        String
+  sector      String?
+  industry    String?
+  exchange    String?
+  country     String   @default("IN")
+  currency    String   @default("INR")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  historicalData HistoricalData[]
+  valuations     Valuation[]
+  snapshots      StockSnapshot[]
+}
+
+// Daily snapshots for trend analysis
+model StockSnapshot {
+  id                String   @id @default(cuid())
+  stockId           String
+  ticker            String
+  date              DateTime
+
+  // Price data
+  price             Float?
+  marketCap         Float?
+  sharesOutstanding Float?
+
+  // Financial metrics
+  revenue           Float?
+  ebitda            Float?
+  ebit              Float?
+  netIncome         Float?
+  freeCashFlow      Float?
+  totalCash         Float?
+  totalDebt         Float?
+
+  // Ratios
+  pe                Float?
+  forwardPE         Float?
+  pb                Float?
+  roe               Float?
+  roce              Float?
+  roa               Float?
+  beta              Float?
+
+  // Margins
+  grossMargin       Float?
+  operatingMargin   Float?
+  profitMargin      Float?
+
+  // Growth rates
+  revenueGrowth     Float?
+  earningsGrowth    Float?
+
+  createdAt         DateTime @default(now())
+
+  stock             Stock    @relation(fields: [stockId], references: [id])
+
+  @@index([ticker, date])
+  @@index([date])
+  @@unique([ticker, date])
+}
+
+// Historical data for multi-year trends
+model HistoricalData {
+  id          String   @id @default(cuid())
+  stockId     String
+  ticker      String
+  fiscalYear  Int      // 2020, 2021, 2022, etc.
+  period      String   // ANNUAL, Q1, Q2, Q3, Q4
+
+  // Income Statement
+  revenue     Float?
+  costOfSales Float?
+  grossProfit Float?
+  ebitda      Float?
+  ebit        Float?
+  netIncome   Float?
+  eps         Float?
+
+  // Balance Sheet
+  totalAssets      Float?
+  currentAssets    Float?
+  cashAndEquivalents Float?
+  totalLiabilities Float?
+  currentLiabilities Float?
+  totalEquity      Float?
+  bookValue        Float?
+
+  // Cash Flow
+  operatingCashFlow Float?
+  investingCashFlow Float?
+  financingCashFlow Float?
+  freeCashFlow      Float?
+  capex             Float?
+  depreciation      Float?
+
+  // Working Capital
+  accountsReceivable Float?
+  inventory          Float?
+  accountsPayable    Float?
+  netWorkingCapital  Float?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stock       Stock    @relation(fields: [stockId], references: [id])
+
+  @@index([ticker, fiscalYear])
+  @@unique([ticker, fiscalYear, period])
+}
+
+// DCF Valuation runs
+model Valuation {
+  id                String   @id @default(cuid())
+  stockId           String
+  ticker            String
+  date              DateTime @default(now())
+
+  // Input assumptions
+  wacc              Float
+  terminalGrowthRate Float
+  taxRate           Float
+  projectionYears   Int    @default(5)
+
+  // Output results
+  intrinsicValue    Float
+  currentPrice      Float
+  upside            Float
+  verdict           String   // UNDERVALUED, OVERVALUED, NEUTRAL
+
+  // Components
+  pvFCFs            Float
+  terminalValue     Float
+  pvTerminalValue   Float
+  enterpriseValue   Float
+  equityValue       Float
+
+  // Scenario
+  scenario          String   @default("base") // bear, base, bull
+
+  // Meta
+  dataQuality       Float?   // 0-100 score
+  confidence        Float?   // 0-100 score
+  aiAssisted        Boolean  @default(false)
+
+  createdAt         DateTime @default(now())
+  stock             Stock    @relation(fields: [stockId], references: [id])
+
+  // Relationships
+  projections       Projection[]
+  assumptions       Json?    // Full assumptions object
+
+  @@index([ticker, date])
+  @@index([date])
+}
+
+// Year-by-year projections for each valuation
+model Projection {
+  id          String   @id @default(cuid())
+  valuationId String
+  year        Int      // 1, 2, 3, 4, 5
+
+  revenue     Float?
+  ebitda      Float?
+  ebit        Float?
+  nopat       Float?
+  depreciation Float?
+  capex       Float?
+  nwcChange   Float?
+  fcf         Float?
+  pvFCF       Float?
+
+  // Growth rates
+  revenueGrowth   Float?
+  ebitdaMargin    Float?
+
+  valuation   Valuation @relation(fields: [valuationId], references: [id])
+
+  @@unique([valuationId, year])
+}
+
+// Macro economic data (RBI, inflation, GDP)
+model MacroData {
+  id            String   @id @default(cuid())
+  date          DateTime
+  country       String   @default("IN")
+
+  // Interest rates (from RBI)
+  repoRate      Float?   // RBI repo rate
+  reverseRepoRate Float?
+  tBill91Day    Float?   // 91-day T-bill
+  tBill364Day   Float?   // 364-day T-bill
+  gSec10Year    Float?   // 10Y G-Sec (risk-free rate)
+
+  // Economic indicators
+  inflationCPI  Float?   // Consumer Price Index
+  inflationWPI  Float?   // Wholesale Price Index
+  gdpGrowth     Float?   // GDP growth rate
+  gdpNominal    Float?   // Nominal GDP
+
+  // Market indicators
+  marketCapToGdp Float? // Buffett indicator
+  rupeeVsUsd    Float?   // USD/INR exchange rate
+
+  source        String   @default("RBI")
+  createdAt     DateTime @default(now())
+
+  @@index([date])
+  @@index([country, date])
+}
+
+// Prediction vs Reality tracking
+model PredictionAccuracy {
+  id                String   @id @default(cuid())
+  ticker            String
+  valuationId       String
+  datePredicted     DateTime
+
+  // Predicted values
+  predictedPrice    Float
+  predictedUpside   Float
+  confidence        Float
+
+  // Actual outcomes
+  actualPrice       Float?
+  actualPerformance Float?   // Actual return %
+  accuracy          Float?   // % deviation from prediction
+
+  // Timeframe
+  timeframeDays     Int      @default(252) // trading days (~1 year)
+  isCompleted       Boolean  @default(false)
+  completedAt       DateTime?
+
+  createdAt         DateTime @default(now())
+
+  @@index([ticker, datePredicted])
+  @@index([isCompleted])
+}
+
+// Data validation logs
+model ValidationLog {
+  id          String   @id @default(cuid())
+  ticker      String
+  date        DateTime @default(now())
+
+  // What was checked
+  field       String   // revenue, ebitda, etc.
+  value       Float?   // The value that was checked
+  rule        String   // Which validation rule
+  severity    String   // ERROR, WARN, INFO
+  message     String   // Human-readable message
+
+  // Context
+  threshold   Float?   // Expected threshold
+  actual      Float?   // Actual value
+
+  createdAt   DateTime @default(now())
+
+  @@index([ticker, date])
+  @@index([severity])
+}

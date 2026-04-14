@@ -195,6 +195,42 @@ MATH RULES (violations = unusable output):
     - CapEx MUST be negative in FCF calculation: Year 5 CapEx = -(convergedCapEx)
     - This ensures Terminal Value reflects maintenance CapEx ≈ Depreciation, not growth CapEx
 
+INSTITUTIONAL VALUATION PROTOCOL (V10.0) - THE "NO-DASH" RULE
+
+### 1. DATA EXTRACTION & RECOVERY (CRITICAL - NEVER LEAVE BLANK)
+- **The "No-Dash" Rule:** You must NOT return "—" for PE, ROE, ROCE, EPS, or Current Ratio.
+- **Manual Calculation:** If the API fails, you MUST derive these:
+  * **PE (TTM)** = Current Price / EPS (TTM)
+  * **ROE** = Net Income / Total Equity × 100
+  * **ROCE** = EBIT / (Total Assets - Current Liabilities) × 100
+  * **Current Ratio** = Total Current Assets / Total Current Liabilities
+  * **EPS (TTM)** = Net Income / Shares Outstanding
+- **Unit Scale:** Force ALL currency values (Revenue, EBITDA, FCF, Debt, Cash) into **Millions** (e.g., ₹1.31T = 1,310,000). The frontend expects absolute numbers.
+- **Example:** Tata Power with NetIncome=₹45B, TotalEquity=₹300B → ROE = 15%
+- **Quality Check:** ROE>25% or ROCE>50% requires verification against sector norms.
+
+### 2. GROWTH RAMP & TERMINAL LOGIC
+- **Infrastructure J-Curve:** For companies with high CapEx (like Tata Power), model an **increasing FCF ramp** in Years 3-5 as projects go live.
+- **Terminal Convergence:** In Year 5, set CapEx equal to Depreciation (CapEx ≈ Depreciation) to prevent "Valuation Decay." This reclaims billions in terminal value.
+
+### 3. QUALITY SCORE SYSTEM
+- Calculate Quality Score = ROE + ROCE
+- High Quality (Score > 100): Exit Multiple = 22x EBITDA, TGR = 6%
+- Standard Quality: Exit Multiple = 16x EBITDA
+- Current Ratio > 3: Lower WACC by 1% (liquidity reduces risk)
+
+GROWTH CONTEXT & PEG RULE (CRITICAL):
+- Calculate PEG Ratio = PE / (RevenueGrowth × 100)
+- If PEG < 0.5: Company is deeply undervalued relative to growth
+- Rule: For PEG < 0.5, Terminal Growth Rate (TGR) MUST be ≥ 5%, NOT the textbook 2.5%
+- Example: P/E = 12x, RevenueGrowth = 30% → PEG = 0.4 → Use TGR = 5.5-6%
+
+MULTIPLES EXPANSION SCENARIO (CRITICAL):
+- If P/E is LOW (<15x) but ROCE is HIGH (>30%), model Multiple Expansion in Terminal Value
+- Lower discount rate by 0.5-1.0% to reflect quality not priced in
+- Higher terminal multiple assumption: Use TGR at upper range (e.g., 5% vs 3%)
+- This captures the re-rating potential when market recognizes quality
+
 SENSITIVITY ANALYSIS (MUST OUTPUT 5×5 MATRIX with rowHeaders/waccRange and colHeaders/tgrRange):
 - Base: wacc = computed WACC percent (e.g., 8.5), tgr = computed Terminal Growth Rate (e.g., 4.5)
 - rowHeaders (WACC values): MUST be [7.0, 8.0, 9.0, 10.0, 11.0] (5 values)

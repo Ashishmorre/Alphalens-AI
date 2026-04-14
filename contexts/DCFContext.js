@@ -21,6 +21,7 @@ import {
   calculateDynamicCapEx,
   calculateGrowthJCurve,
   calculateTerminalCapEx,
+  calculateQualityPremium,
 } from '@/lib/financial-utils'
 
 const DCFContext = createContext(undefined)
@@ -64,19 +65,30 @@ export function DCFProvider({ children, rawApiData, stockData }) {
     })
 
     // Terminal Growth Rate: Market-aligned (not hardcoded 2.5%)
-    // Higher P/E + sector tailwinds = higher TGR
+    // Higher P/E + High ROCE + sector tailwinds = higher TGR
     const basePE = stockData?.pe || d?.pe || 15
+    const stockROCE = stockData?.roce || d?.roce || 0
     let dynamicTGR = 2.5
-    if (basePE > 30) dynamicTGR = 5.5
-    else if (basePE > 25) dynamicTGR = 4.5
-    else if (basePE > 20) dynamicTGR = 3.5
-    else if (basePE > 15) dynamicTGR = 3.0
-    else dynamicTGR = 2.0
+
+    // Dynamic TGR: If PE > 25 OR ROCE > 50%, use 5.8% - 6.2% (growth premium)
+    if (basePE > 30 || stockROCE > 50) {
+      dynamicTGR = 6.0
+    } else if (basePE > 25 || stockROCE > 35) {
+      dynamicTGR = 5.8
+    } else if (basePE > 20) {
+      dynamicTGR = 4.5
+    } else if (basePE > 15) {
+      dynamicTGR = 3.5
+    } else if (basePE > 10) {
+      dynamicTGR = 3.0
+    } else {
+      dynamicTGR = 2.5
+    }
 
     // Sector premium for utilities and renewables
     const sector = (stockData?.sector || d?.sector || '').toLowerCase()
     if (sector.includes('utility') || sector.includes('renewable')) {
-      dynamicTGR = Math.min(6.0, dynamicTGR + 0.5) // Infrastructure tailwind
+      dynamicTGR = Math.min(6.0, dynamicTGR + 0.4) // Infrastructure tailwind (slightly reduced)
     }
 
     const wacc = d?.assumptions?.wacc || dynamicWACC
@@ -189,7 +201,10 @@ export function DCFProvider({ children, rawApiData, stockData }) {
     const finalFCF = calculatedProjections[calculatedProjections.length - 1]?.fcf || 0
 
     // ANCHOR 1: Calculate Enterprise Value from scratch using PV of FCFs + PV of Terminal Value
-    const terminalValue = calculateTerminalValue(finalFCF, wacc, terminalGrowthRate)
+    // Exit Multiple Anchor: Use max of Gordon Growth or 16x-22x EBITDA (quality-based)
+    const finalEBITDA = calculatedProjections[calculatedProjections.length - 1]?.ebitda || 0
+    const qualityScore = (stockData?.roe || d?.roe || 0) + (stockData?.roce || d?.roce || 0)
+    const terminalValue = calculateTerminalValue(finalFCF, wacc, terminalGrowthRate, finalEBITDA, qualityScore)
     const pvTerminalValue = calculatePVTerminalValue(terminalValue, wacc, 5)
     const enterpriseValue = calculateEnterpriseValue(pvFCFs, pvTerminalValue)
 
@@ -200,8 +215,19 @@ export function DCFProvider({ children, rawApiData, stockData }) {
 
     // ANCHOR 3: ALWAYS re-derive equityValue from enterpriseValue anchor
     // NEVER use d.equityValue from AI (it may be incorrect)
-    const equityValue = calculateEquityValue(enterpriseValue, totalCash, totalDebt, marketCap)
-    const intrinsicValuePerShare = calculateIntrinsicValuePerShare(equityValue, sharesOutstanding)
+    // Include SOTP buffer for utilities (infrastructure value not in cash flows)
+    // 'sector' already defined at line 78 (lowercased for TGR calculation)
+    const equityValue = calculateEquityValue(enterpriseValue, totalCash, totalDebt, marketCap, sector)
+
+    // Quality Premium: High ROE/ROCE companies get scarcity premium (Oswal Pumps effect)
+    const rawIntrinsicValue = calculateIntrinsicValuePerShare(equityValue, sharesOutstanding)
+    const stockROE = stockData?.roe || d?.roe
+    // stockROCE already defined at line 70 (used for TGR calculation)
+    const intrinsicValuePerShare = calculateQualityPremium({
+      intrinsicValue: rawIntrinsicValue,
+      roe: stockROE,
+      roce: stockROCE,
+    })
 
     return {
       currentPrice,
