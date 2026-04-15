@@ -33,8 +33,8 @@ export default function RootLayout({ children }) {
         <div style={{ position: 'relative', zIndex: 1 }}>
           {children}
         </div>
-      </body>
       <Analytics />
+      </body>
     </html>
   )
 }
