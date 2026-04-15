@@ -78,7 +78,7 @@ export async function GET(request) {
 
     // ─── NSE XBRL Fallback for Indian Equities ─────────────────────────────
     const isIndianTicker = validation.ticker.endsWith('.NS') || validation.ticker.endsWith('.BO')
-	console.log(`[API Check] ${validation.ticker}: isIndian=${isIndianTicker}, needsROE=${needsROE}`)
+	console.log(`[API Check] ${validation.ticker}: isIndian=${isIndianTicker}`)
 
     if (isIndianTicker) {
       const needsDebtToEquity = data.debtToEquity === null || data.debtToEquity === undefined
