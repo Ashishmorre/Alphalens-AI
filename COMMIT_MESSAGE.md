@@ -1,0 +1,1 @@
+Fixed Critical bugs in stock route
