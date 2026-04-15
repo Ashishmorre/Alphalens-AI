@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
 
-const POPULAR = ['AAPL', 'NVDA', 'MSFT', 'TSLA', 'GOOGL', 'META', 'AMZN', 'JPM', 'V', 'NFLX']
+const POPULAR = ['AAPL', 'NVDA', 'RELIANCE', 'TCS', 'MSFT', 'HDFC', 'INFY', 'TSLA', 'SBIN', 'GOOGL']
 
 // Debounce hook for input handling
 function useDebouncedValue(value, delay = 300) {
