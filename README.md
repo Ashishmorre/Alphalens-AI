@@ -793,6 +793,31 @@ npm start
 
 ### 12.2 Deployment (Vercel)
 
+#### Vercel Analytics Setup
+
+**Package Installation:**
+- Installed `@vercel/analytics` version 2.0.1 using npm
+- Package added to dependencies in package.json
+- package-lock.json updated with all necessary dependencies
+
+**Implementation in `app/layout.js`:**
+- Added import statement: `import { Analytics } from '@vercel/analytics/next'`
+- Added `<Analytics />` component inside the `<body>` tag, after the main content div
+- Placement ensures proper tracking across all pages in the Next.js App Router
+
+**Framework-Specific Configuration:**
+- Followed official Vercel documentation (fetched from https://vercel.com/docs/analytics/quickstart)
+- Used the Next.js App Router specific implementation pattern
+- Analytics component placed in the root layout to track all pages automatically
+- Preserved existing layout structure, metadata, and styling
+
+**Build Verification:**
+- Successfully ran `npm run build`
+- build completed without errors
+- All static and dynamic routes compiled successfully
+- No TypeScript errors detected (completed in 114ms)
+- The Analytics component is now ready to track visitors upon deployment to Vercel
+
 ```json
 // vercel.json
 {
