@@ -78,6 +78,7 @@ export async function GET(request) {
 
     // ─── NSE XBRL Fallback for Indian Equities ─────────────────────────────
     const isIndianTicker = validation.ticker.endsWith('.NS') || validation.ticker.endsWith('.BO')
+	console.log(`[API Check] ${validation.ticker}: isIndian=${isIndianTicker}, needsROE=${needsROE}`)
 
     if (isIndianTicker) {
       const needsDebtToEquity = data.debtToEquity === null || data.debtToEquity === undefined
@@ -165,6 +166,7 @@ export async function GET(request) {
         const screenerResult = await fetchScreenerData(validation.ticker)
         if (screenerResult) {
           Object.assign(data, mergeScreenerData(data, screenerResult))
+          console.log(`[Screener Result] ${validation.ticker}: ROE=${data.roe}, Source=${data._dataSources?.roe || 'none'}`)
         }
       } catch (screenerError) {
         console.warn('Screener data fetch failed:', screenerError.message)
@@ -172,12 +174,14 @@ export async function GET(request) {
     }
 
     // ─── TradingView Fallback ────────────────────────────────────────────
-    const missingCritical = [
-      data.pe, data.priceToBook, data.debtToEquity,
-      data.roe, data.currentRatio, data.evToEbitda,
-    ].filter(v => v === null || v === undefined).length
+	// FIX: ROE=0 counts as missing so TradingView can fetch real value
+	const hasMissingROE = data.roe === null || data.roe === undefined || data.roe === 0
+	const missingCritical = [
+		data.pe, data.priceToBook, data.debtToEquity,
+		data.currentRatio, data.evToEbitda,
+		].filter(v => v === null || v === undefined).length + (hasMissingROE ? 1 : 0)
 
-    if (missingCritical >= 2) {
+	if (missingCritical >= 2 || hasMissingROE) {
       try {
         const tv = tickerToTradingView(validation.ticker)
         if (tv) {
