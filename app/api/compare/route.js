@@ -124,8 +124,8 @@ export async function POST(request) {
     )
   }
 
-  // Check AI keys
-  if (!process.env.CEREBRAS_API_KEY && !process.env.GROQ_API_KEY) {
+  // Check NVIDIA API key (currently the only supported provider)
+  if (!process.env.NVIDIA_API_KEY) {
     return NextResponse.json(
       { success: false, error: 'Service temporarily unavailable' },
       { status: 503, headers }
