@@ -9,7 +9,7 @@ import RiskRatios from '../components/tabs/RiskRatios'
 import NewsSentiment from '../components/tabs/NewsSentiment'
 import CompareStocks from '../components/CompareStocks'
 import ExportPDF from '../components/ExportPDF'
-import { AnalysisLoader, RunAnalysisButton, SkeletonStockOverview } from '../components/LoadingCard'
+import { SkeletonStockOverview, RunAnalysisButton, TabSkeleton } from '../components/LoadingCard'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { apiFetch, apiPost, getErrorMessage } from '@/lib/api-client'
 import { normalizeAIResponse } from '@/lib/ai-normalizer'
@@ -185,9 +185,9 @@ export default function Home() {
                   />
                 </div>
 
-                <div className="card" style={{ minHeight: '300px', padding: analysisLoading || !currentAnalysis ? '0' : '1.5rem' }}>
+                <div className="card" style={{ minHeight: '300px', padding: analysisLoading || !currentAnalysis ? '1.5rem' : '1.5rem' }}>
                   {analysisLoading ? (
-                    <AnalysisLoader type={activeAnalysisTab} />
+                    <TabSkeleton type={activeAnalysisTab} />
                   ) : currentAnalysis ? (
                     <>
                       {activeAnalysisTab === 'thesis' && (
