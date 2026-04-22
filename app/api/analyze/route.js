@@ -388,10 +388,17 @@ INJECTED FINANCIAL DATA (MUST USE THESE EXACT VALUES):
 - Forward P/E: ${fwdPe}x
 - EV/EBITDA: ${evEbitda}
 - Debt to Equity: ${debtEq}
+- Total Debt: ${fmtNumber(d.totalDebt)}
+- Total Cash: ${fmtNumber(d.totalCash)}
+- Total Assets: ${fmtNumber(d.totalAssets || null)}
+- EBITDA: ${fmtNumber(d.ebitda)}
+- Interest Expense: ${fmtNumber(d.interestExpense || null)}
+- Net Income: ${fmtNumber(d.netIncome || null)}
 - ROE: ${roe}
 - Free Cash Flow: ${fmtNumber(d.freeCashFlow)}
 - FCF Margin: ${fcfMargin}
 - Current Ratio: ${currentRatio}
+- Quick Ratio: ${d.quickRatio?.toFixed?.(2) || 'N/A'}
 - Beta: ${d.beta?.toFixed?.(2) || '—'}
 - Avg Volume: ${fmtNumber(d.avgVolume)}
 - Sector/Industry Median P/E: ${sectorMedianPE}${industryPE != null ? ' — USE THIS EXACT value for sectorMedian of P/E (TTM).' : ' — estimate from sector knowledge.'}
@@ -439,11 +446,16 @@ Return ONLY JSON matching this EXACT structure (field names must match exactly):
   ],
   "qualityRatios": [
     {"metric": "ROE", "value": "${roe}", "benchmark": "12.0%", "rating": "${d.roe > 0.15 ? 'EXCELLENT' : d.roe > 0.10 ? 'GOOD' : 'AVERAGE'}"},
-    {"metric": "Current Ratio", "value": "${currentRatio}x", "benchmark": "1.5x", "rating": "${Number(currentRatio) > 2 ? 'EXCELLENT' : Number(currentRatio) > 1.5 ? 'GOOD' : 'AVERAGE'}"},
-    {"metric": "FCF Margin", "value": "${fcfMargin}", "benchmark": "10%", "rating": "<EXCELLENT|GOOD|AVERAGE|POOR>"}
+    {"metric": "FCF Margin", "value": "${fcfMargin}", "benchmark": "10%", "rating": "<EXCELLENT|GOOD|AVERAGE|POOR>"},
+    {"metric": "Net Margin", "value": "${fmtPercent(d.profitMargin)}", "benchmark": "8%", "rating": "<EXCELLENT|GOOD|AVERAGE|POOR>"},
+    {"metric": "ROCE", "value": "<compute: EBIT / (TotalAssets - CurrentLiabilities) × 100 or estimate from sector>", "benchmark": "15%", "rating": "<EXCELLENT|GOOD|AVERAGE|POOR>"}
   ],
   "leverageRatios": [
-    {"metric": "Debt/Equity", "value": "${debtEq}x", "threshold": "1.0x", "risk": "${Number(debtEq) > 1.5 ? 'HIGH' : Number(debtEq) > 0.8 ? 'MEDIUM' : 'LOW'}"}
+    {"metric": "Debt/Equity", "value": "${debtEq === '—' ? 'N/A' : debtEq + 'x'}", "threshold": "1.0x", "risk": "${Number(debtEq) > 1.5 ? 'HIGH' : Number(debtEq) > 0.8 ? 'MEDIUM' : 'LOW'}"},
+    {"metric": "Current Ratio", "value": "${currentRatio === '—' ? 'N/A' : currentRatio + 'x'}", "threshold": "1.5x", "risk": "${Number(currentRatio) < 1 ? 'HIGH' : Number(currentRatio) < 1.5 ? 'MEDIUM' : 'LOW'}"},
+    {"metric": "Net Debt / EBITDA", "value": "<compute: (TotalDebt - Cash) / EBITDA, format as Xx>", "threshold": "3.0x", "risk": "<LOW|MEDIUM|HIGH based on result>"},
+    {"metric": "Interest Coverage", "value": "<compute: EBIT / InterestExpense if available, else estimate from sector norms, format as Xx>", "threshold": "3.0x", "risk": "<LOW|MEDIUM|HIGH — HIGH if coverage < 2x>"},
+    {"metric": "Debt / Assets", "value": "<compute: TotalDebt / TotalAssets if available, else estimate, format as X%>", "threshold": "50%", "risk": "<LOW|MEDIUM|HIGH>"}
   ],
   "riskFactors": [
     {"risk": "Liquidity Risk", "severity": "${Number(currentRatio) < 1 ? 'HIGH' : Number(currentRatio) < 1.5 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "<analyze current ratio ${currentRatio} with sector context>"},
