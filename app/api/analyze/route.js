@@ -522,16 +522,52 @@ Return ONLY JSON matching this exact structure:
 }
 
 /**
- * Strip markdown code fences from AI output before JSON parsing.
- * Some models wrap JSON in ```json ... ``` blocks.
+ * Robustly extract a JSON object from AI output.
+ * Strategy 1: Strip markdown fences (e.g. ```json ... ```), then parse.
+ * Strategy 2: Bracket-depth scan to find the outermost { } block.
+ *             Handles models that prepend/append conversational text.
+ * @param {string} raw - Raw AI response string
+ * @returns {string} The extracted JSON string (not yet parsed)
  */
-function cleanAIResponse(raw) {
+function extractJSON(raw) {
   if (!raw || typeof raw !== 'string') return raw
-  // Remove leading/trailing whitespace
+
+  // Strategy 1: Strip common markdown fences
   let cleaned = raw.trim()
-  // Strip ```json ... ``` or ``` ... ``` fences
-  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '')
-  return cleaned.trim()
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+
+  // Quick check if it already looks like valid JSON
+  if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+    return cleaned
+  }
+
+  // Strategy 2: Bracket-depth tracking to extract the first complete { } block
+  let depth = 0
+  let start = -1
+  let inString = false
+  let escape = false
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i]
+
+    if (escape) { escape = false; continue }
+    if (ch === '\\' && inString) { escape = true; continue }
+    if (ch === '"') { inString = !inString; continue }
+    if (inString) continue
+
+    if (ch === '{') {
+      if (depth === 0) start = i
+      depth++
+    } else if (ch === '}') {
+      depth--
+      if (depth === 0 && start !== -1) {
+        return raw.slice(start, i + 1)
+      }
+    }
+  }
+
+  // Return the fence-stripped version as last resort
+  return cleaned
 }
 
 /**
@@ -611,26 +647,18 @@ export async function POST(request) {
       analysisType: analysisType,
     })
 
-    // 1. Strip markdown fences the AI may have added
-    const cleanedResponse = cleanAIResponse(rawResponse)
+    // 1. Extract JSON robustly (handles fences, conversational preamble, etc.)
+    const cleanedResponse = extractJSON(rawResponse)
 
     // 2. Parse JSON with defensive fallback
     let analysisData
     try {
       analysisData = safeParseJSON(cleanedResponse)
     } catch (parseError) {
-      console.error('RAW AI response:', rawResponse.slice(0, 500))
-      // Try to extract a JSON object from anywhere in the response
-      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        try {
-          analysisData = safeParseJSON(jsonMatch[0])
-        } catch {
-          throw parseError
-        }
-      } else {
-        throw parseError
-      }
+      console.error('[analyze] JSON parse failed. Raw response (first 800 chars):', rawResponse?.slice(0, 800))
+      console.error('[analyze] Cleaned candidate (first 800 chars):', cleanedResponse?.slice(0, 800))
+      // The extractJSON already tried bracket-depth scanning, so no secondary retry needed
+      throw new Error(`AI returned unparseable output: ${parseError.message}`)
     }
 
     // Normalize field names for frontend consistency
