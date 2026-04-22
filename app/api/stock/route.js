@@ -23,6 +23,19 @@ import { fetchTradingViewData, mergeTradingViewData, tickerToTradingView } from 
 
 const RATE_LIMIT = RATE_LIMIT_PRESETS.stockData
 
+// Known NSE-listed tickers for server-side auto-suffix
+// Mirrors the KNOWN_INDIAN_TICKERS set in SearchBar.js
+const KNOWN_INDIAN_TICKERS = new Set([
+  'RELIANCE', 'TCS', 'HDFCBANK', 'HDFC', 'INFY', 'SBIN', 'ICICIBANK',
+  'HINDUNILVR', 'KOTAKBANK', 'ITC', 'BHARTIARTL', 'AXISBANK', 'LT', 'ASIANPAINT',
+  'MARUTI', 'BAJFINANCE', 'BAJAJFINSV', 'WIPRO', 'HCLTECH', 'ULTRACEMCO',
+  'TITAN', 'SUNPHARMA', 'TATAMOTORS', 'TATASTEEL', 'NESTLEIND', 'ADANIPORTS',
+  'POWERGRID', 'NTPC', 'ONGC', 'JSWSTEEL', 'GRASIM', 'TECHM', 'INDUSINDBK',
+  'DIVISLAB', 'DRREDDY', 'CIPLA', 'BRITANNIA', 'EICHERMOT', 'TATAPOWER',
+  'ADANIENT', 'VEDL', 'COALINDIA', 'HINDALCO', 'BPCL', 'HEROMOTOCO',
+  'SIEMENS', 'PIDILITIND', 'HAVELLS', 'DABUR', 'MARICO'
+])
+
 /**
  * GET /api/stock?ticker={ticker}
  * Fetch stock data from Yahoo Finance with NSE XBRL fallback for Indian equities
@@ -67,6 +80,14 @@ export async function GET(request) {
         { success: false, error: validation.error },
         { status: 400, headers }
       )
+    }
+
+    // ─── Server-Side Indian Ticker Normalization ───────────────────────────
+    // If ticker has no suffix but is a known NSE stock, auto-append .NS BEFORE fetching.
+    // This catches direct API calls that bypass the SearchBar frontend fix.
+    if (!validation.ticker.includes('.') && KNOWN_INDIAN_TICKERS.has(validation.ticker)) {
+      validation.ticker = validation.ticker + '.NS'
+      console.log(`[API Normalize] Auto-appended .NS → ${validation.ticker}`)
     }
 
     // Fetch and transform data
