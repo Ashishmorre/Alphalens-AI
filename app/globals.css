@@ -128,6 +128,15 @@ body {
   100% { background-position: 200% 0; }
 }
 
+/* Skeleton wrapper: guarantees it's always visible */
+.skeleton-wrapper {
+  animation: skeletonIn 0.25s ease-out both;
+}
+@keyframes skeletonIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Gain / Loss colors */
 .gain { color: var(--gain); }
 .loss { color: var(--loss); }
@@ -168,15 +177,16 @@ body {
 }
 .btn-primary {
   background: var(--teal);
-  color: #07090d;
+  color: #000c08;
   border-color: var(--teal);
+  font-weight: 600;
 }
 .btn-primary:hover {
   background: #00e8bb;
   box-shadow: 0 0 20px rgba(0, 212, 170, 0.3);
 }
 .btn-primary:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: not-allowed;
   box-shadow: none;
 }
@@ -325,6 +335,10 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 @keyframes tickerTape {
   0% { transform: translateX(0); }

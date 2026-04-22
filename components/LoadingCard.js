@@ -19,7 +19,7 @@ export function SkeletonCard({ lines = 4 }) {
 
 export function SkeletonStockOverview() {
   return (
-    <div className="animate-fade-in" style={{ marginBottom: '1.5rem' }}>
+    <div className="skeleton-wrapper" style={{ marginBottom: '1.5rem' }}>
       {/* Main price card skeleton */}
       <div className="card" style={{ padding: '1.75rem 2rem', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -159,18 +159,23 @@ export function RunAnalysisButton({ type, onClick, loading }) {
 
   return (
     <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-      <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{icons[type]}</div>
+      <div style={{ fontSize: '2.5rem', marginBottom: '1rem', opacity: 0.7 }}>{icons[type]}</div>
       <div style={{ fontFamily: 'var(--font-playfair)', fontSize: '1.3rem', color: 'var(--txt-primary)', marginBottom: '0.5rem' }}>
         {labels[type]}
       </div>
       <p style={{ fontSize: '0.85rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', marginBottom: '2rem', maxWidth: '380px', margin: '0 auto 2rem', lineHeight: 1.6 }}>
-        Click to run a comprehensive AI analysis powered by Claude. Takes 5-15 seconds.
+        Click to run a comprehensive AI analysis. Takes 5–15 seconds.
       </p>
-      <button className="btn btn-primary" onClick={onClick} disabled={loading} style={{ fontSize: '0.9rem', padding: '0.75rem 2rem' }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <button
+        className="btn btn-primary"
+        onClick={onClick}
+        disabled={loading}
+        style={{ fontSize: '0.9rem', padding: '0.75rem 2rem', color: '#001a12', fontWeight: 700, letterSpacing: '0.04em' }}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="#001a12" stroke="none">
           <path d="M5 3l14 9-14 9V3z"/>
         </svg>
-        Run Analysis
+        <span style={{ color: '#001a12', fontWeight: 700 }}>Run Analysis</span>
       </button>
     </div>
   )
