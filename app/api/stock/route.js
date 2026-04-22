@@ -17,7 +17,7 @@ import {
   sanitizeInput,
 } from '@/lib/security'
 import { fetchNSEData, parseIndASXBRL } from '@/lib/nse-xbrl-parser'
-import { calculateRatiosFromXBRL } from '@/lib/financial-utils'
+import { calculateRatiosFromXBRL, computeDerivedMetrics } from '@/lib/financial-utils'
 import { fetchScreenerData, mergeScreenerData, isScreenerEligible } from '@/lib/screener-scraper'
 import { fetchTradingViewData, mergeTradingViewData, tickerToTradingView } from '@/lib/tradingview-scraper'
 
@@ -220,17 +220,13 @@ export async function GET(request) {
       }
     }
 
-    // ─── Final ROE Calculation Fallback ──────────────────────────────────
-    // If ROE is still missing but we have netIncome and totalEquity, calculate it
-    if ((data.roe === null || data.roe === undefined) && data.netIncome && data.totalEquity && data.totalEquity > 0) {
-      data.roe = data.netIncome / data.totalEquity
-      console.log(`[ROE Final Fallback] ${validation.ticker}: ROE = ${data.netIncome} / ${data.totalEquity} = ${data.roe}`)
-      if (!data._dataSources) data._dataSources = {}
-      data._dataSources.roe = 'calculated_from_equity'
-    }
+    // ─── Final Derived Metrics Pass ───────────────────────────────────────
+    // Fill any remaining missing metrics (ROE, EV/EBITDA, P/E, P/B, FCF)
+    // using cascading formula fallbacks from all data we've accumulated.
+    const enrichedData = computeDerivedMetrics(data)
 
     return NextResponse.json(
-      { success: true, data, error: null },
+      { success: true, data: enrichedData, error: null },
       { status: 200, headers }
     )
 

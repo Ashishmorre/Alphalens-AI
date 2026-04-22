@@ -70,17 +70,18 @@ export default function StockOverview({ data, onCompare }) {
           {/* Right: Key stats grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', minWidth: '280px', maxWidth: '480px', flex: '1 1 280px' }}>
             {[
-              { label: 'Market Cap', value: formatNumber(data.marketCap, 2, data.currency) },
-              { label: 'P/E (TTM)', value: formatMultiple(data.pe) },
-              { label: 'Forward P/E', value: formatMultiple(data.forwardPE) },
-              { label: 'EV/EBITDA', value: formatMultiple(data.evToEbitda) },
-              { label: 'EPS (TTM)', value: formatPrice(data.eps, data.currency) },
-              { label: 'Beta', value: data.beta?.toFixed(2) || '—' },
-              { label: 'Volume', value: formatVolume(data.volume) },
-              { label: 'Avg Volume', value: formatVolume(data.avgVolume) },
-            ].map(({ label, value }) => (
-              <StatCard key={label} label={label} value={value} />
-            ))}
+              { dkey: null,          label: 'Market Cap',   value: formatNumber(data.marketCap, 2, data.currency) },
+              { dkey: 'pe',          label: 'P/E (TTM)',    value: formatMultiple(data.pe) },
+              { dkey: null,          label: 'Forward P/E',  value: formatMultiple(data.forwardPE) },
+              { dkey: 'evToEbitda',  label: 'EV/EBITDA',   value: formatMultiple(data.evToEbitda) },
+              { dkey: null,          label: 'EPS (TTM)',    value: formatPrice(data.eps, data.currency) },
+              { dkey: null,          label: 'Beta',         value: data.beta?.toFixed(2) || '—' },
+              { dkey: null,          label: 'Volume',       value: formatVolume(data.volume) },
+              { dkey: null,          label: 'Avg Volume',   value: formatVolume(data.avgVolume) },
+            ].map(({ dkey, label, value }) => {
+              const isDerived = dkey && data._derived?.[dkey]
+              return <StatCard key={label} label={label} value={value} isDerived={isDerived} />
+            })}
           </div>
         </div>
 
@@ -97,29 +98,42 @@ export default function StockOverview({ data, onCompare }) {
       {/* Secondary stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.625rem' }}>
         {[
-          { label: 'Revenue', value: formatNumber(data.revenue, 2, data.currency) },
-          { label: 'EBITDA', value: formatNumber(data.ebitda, 2, data.currency) },
-          { label: `FCF (FY${data._fcfPeriod || 'TTM'})`, value: formatNumber(data.freeCashFlow, 2, data.currency) },
-          { label: 'Gross Margin', value: formatPct(data.grossMargin) },
-          { label: 'Net Margin', value: formatPct(data.profitMargin) },
-          { label: 'ROE', value: data.roe != null ? formatPct(data.roe) : '—' },
-          { label: 'D/E Ratio', value: formatMultiple(data.debtToEquity) },
-          { label: 'Analyst Target', value: formatPrice(data.targetMeanPrice, data.currency) },
-        ].map(({ label, value }) => (
-          <div key={label} className="card" style={{ padding: '0.75rem 1rem' }}>
-            <div style={{ fontSize: '0.68rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.3rem' }}>{label}</div>
-            <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.95rem', color: 'var(--txt-primary)', fontWeight: 500 }}>{value}</div>
-          </div>
-        ))}
+          { dkey: 'netIncome',    label: 'Revenue',                          value: formatNumber(data.revenue, 2, data.currency) },
+          { dkey: 'ebitda',      label: 'EBITDA',                            value: formatNumber(data.ebitda, 2, data.currency) },
+          { dkey: 'fcf',        label: `FCF (FY${data._fcfPeriod || 'TTM'})`, value: formatNumber(data.freeCashFlow, 2, data.currency) },
+          { dkey: null,          label: 'Gross Margin',                      value: formatPct(data.grossMargin) },
+          { dkey: null,          label: 'Net Margin',                        value: formatPct(data.profitMargin) },
+          { dkey: 'roe',         label: 'ROE',                               value: data.roe != null ? formatPct(data.roe) : '—' },
+          { dkey: null,          label: 'D/E Ratio',                         value: formatMultiple(data.debtToEquity) },
+          { dkey: null,          label: 'Analyst Target',                    value: formatPrice(data.targetMeanPrice, data.currency) },
+        ].map(({ dkey, label, value }) => {
+          const isDerived = dkey && data._derived?.[dkey]
+          return (
+            <div key={label} className="card" style={{ padding: '0.75rem 1rem' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                {label}
+                {isDerived && (
+                  <span title={`Estimated: ${isDerived}`} style={{ fontSize: '0.58rem', color: 'rgba(0,212,170,0.55)', letterSpacing: 0 }}>~</span>
+                )}
+              </div>
+              <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.95rem', color: 'var(--txt-primary)', fontWeight: 500 }}>{value}</div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
 }
 
-function StatCard({ label, value }) {
+function StatCard({ label, value, isDerived }) {
   return (
     <div style={{ padding: '0.75rem', background: 'rgba(0,0,0,0.25)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.04)' }}>
-      <div style={{ fontSize: '0.65rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.3rem' }}>{label}</div>
+      <div style={{ fontSize: '0.65rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+        {label}
+        {isDerived && (
+          <span title={`Estimated: ${isDerived}`} style={{ fontSize: '0.58rem', color: 'rgba(0,212,170,0.55)', letterSpacing: 0 }}>~</span>
+        )}
+      </div>
       <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.95rem', color: 'var(--txt-primary)', fontWeight: 500 }}>{value}</div>
     </div>
   )
