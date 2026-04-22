@@ -1,7 +1,35 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
 
-const POPULAR = ['AAPL', 'NVDA', 'RELIANCE', 'TCS', 'MSFT', 'HDFC', 'INFY', 'TSLA', 'SBIN', 'GOOGL']
+const POPULAR = ['AAPL', 'NVDA', 'RELIANCE.NS', 'TCS.NS', 'MSFT', 'HDFCBANK.NS', 'INFY.NS', 'TSLA', 'SBIN.NS', 'GOOGL']
+
+// Known Indian tickers that should get .NS suffix auto-appended
+const KNOWN_INDIAN_TICKERS = new Set([
+  'RELIANCE', 'TCS', 'HDFCBANK', 'HDFC', 'INFY', 'INFOSY', 'SBIN', 'ICICIBANK',
+  'HINDUNILVR', 'KOTAKBANK', 'ITC', 'BHARTIARTL', 'AXISBANK', 'LT', 'ASIANPAINT',
+  'MARUTI', 'BAJFINANCE', 'BAJAJFINSV', 'WIPRO', 'HCLTECH', 'ULTRACEMCO',
+  'TITAN', 'SUNPHARMA', 'TATAMOTORS', 'TATASTEEL', 'NESTLEIND', 'ADANIPORTS',
+  'POWERGRID', 'NTPC', 'ONGC', 'JSWSTEEL', 'GRASIM', 'TECHM', 'INDUSINDBK',
+  'DIVISLAB', 'DRREDDY', 'CIPLA', 'BRITANNIA', 'EICHERMOT', 'TATAPOWER',
+  'ADANIENT', 'VEDL', 'COALINDIA', 'HINDALCO', 'BPCL', 'HEROMOTOCO',
+  'BAJAJ-AUTO', 'SIEMENS', 'PIDILITIND', 'HAVELLS', 'DABUR', 'MARICO',
+  'NIFTY', 'BANKNIFTY', 'SENSEX'
+])
+
+/**
+ * Auto-append .NS suffix for known Indian tickers that don't already have a suffix.
+ * @param {string} ticker
+ * @returns {string}
+ */
+function normalizeTickerForSearch(ticker) {
+  const upper = ticker.toUpperCase().trim()
+  // Already has a suffix (.NS, .BO, .L, etc.) — leave it alone
+  if (upper.includes('.')) return upper
+  // Known Indian ticker — auto-add .NS
+  if (KNOWN_INDIAN_TICKERS.has(upper)) return upper + '.NS'
+  // Unknown — return as-is (US/global)
+  return upper
+}
 
 // Debounce hook for input handling
 function useDebouncedValue(value, delay = 300) {
@@ -27,7 +55,7 @@ export default function SearchBar({ onSearch, loading }) {
 
   const handleSubmit = useCallback((e) => {
     e?.preventDefault()
-    const val = input.trim().toUpperCase()
+    const val = normalizeTickerForSearch(input.trim())
     if (val) onSearch(val)
   }, [input, onSearch])
 
@@ -42,6 +70,7 @@ export default function SearchBar({ onSearch, loading }) {
   }
 
   const handlePopular = (ticker) => {
+    // Tickers in POPULAR already have correct suffix — just use as-is
     setInput(ticker)
     onSearch(ticker)
   }
