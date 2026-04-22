@@ -532,6 +532,12 @@ Return ONLY JSON matching this exact structure:
 function extractJSON(raw) {
   if (!raw || typeof raw !== 'string') return raw
 
+  // ReDoS protection: cap input length before applying any regex or iteration
+  const MAX_RESPONSE_CHARS = 100_000
+  if (raw.length > MAX_RESPONSE_CHARS) {
+    raw = raw.slice(0, MAX_RESPONSE_CHARS)
+  }
+
   // Strategy 1: Strip common markdown fences
   let cleaned = raw.trim()
   cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
