@@ -168,11 +168,3 @@ export async function GET(request) {
     )
   }
 }
-
-function createRateLimitHeaders(rateLimit) {
-  return {
-    'X-RateLimit-Limit': rateLimit.limit?.toString() || '0',
-    'X-RateLimit-Remaining': rateLimit.remaining?.toString() || '0',
-    'X-RateLimit-Reset': rateLimit.reset?.toString() || '0',
-  }
-}
