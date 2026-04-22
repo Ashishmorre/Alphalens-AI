@@ -38,7 +38,7 @@ function buildPrompt(ticker, data, analysisType) {
 
 /**
  * ============================================================================
- * 🔒 STRICT CODE FREEZE IN EFFECT 🔒
+ * ðŸ”’ STRICT CODE FREEZE IN EFFECT ðŸ”’
  * MODULE: Investment Thesis & News Sentiment
  * STATUS: Production Ready & Validated
  *
@@ -74,7 +74,7 @@ CRITICAL MATH RULES - VIOLATION IS STRICTLY FORBIDDEN:
 5. All case probabilities (bull + base + bear) should sum to approximately 100.
 6. upsideDownside MUST be calculated as: ((targetPrice - ${price === 'N/A' ? 0 : price}) / ${price === 'N/A' ? 1 : price}) * 100
 7. If current price is ${price}, then:
-   - A target of ₹422.50 on ₹399.35 is +5.8% upside, NOT +0.0%
+   - A target of â‚¹422.50 on â‚¹399.35 is +5.8% upside, NOT +0.0%
    - A target below current is negative upside (downside)
 
 Return ONLY JSON matching this structure:
@@ -110,10 +110,10 @@ function buildDCFPrompt(ticker, d) {
   const price = d.price?.toFixed?.(2) || 100
   const shares = d.sharesOutstanding ? d.sharesOutstanding.toLocaleString() : 'calculate from market cap'
   return {
-    system: 'You are a Quantitative Financial Modeler. You MUST return ONLY a raw valid JSON object — no markdown, no backticks, no explanation. Your math must be internally consistent.',
+    system: 'You are a Quantitative Financial Modeler. You MUST return ONLY a raw valid JSON object â€” no markdown, no backticks, no explanation. Your math must be internally consistent.',
     user: `Build a 5-year DCF model for ${ticker} (${d.name || ticker}).
 
-INPUT DATA — use these exact figures as your base:
+INPUT DATA â€” use these exact figures as your base:
 - Current Price: ${price} ${d.currency || 'USD'}
 - Revenue (TTM): ${fmtNumber(d.revenue)}
 - EBITDA (TTM): ${fmtNumber(d.ebitda)}
@@ -131,27 +131,27 @@ INPUT DATA — use these exact figures as your base:
 - Sector: ${d.sector || 'N/A'}, Industry: ${d.industry || 'N/A'}
 
 MATH RULES (violations = unusable output):
-1. UNIT CONSISTENCY (CRITICAL - ABSOLUTE NUMBERS ONLY): ALL currency values (Revenue, EBITDA, FCF, Cash, Debt, EV, EquityValue) MUST be output as RAW ABSOLUTE NUMBERS (e.g., 2,500,000,000). NEVER use units like "2.5B" or "2500M". The frontend expects raw numbers for correct per-share calculations. Input may be formatted (e.g., "$2.5B" or "₹600.32B") - you MUST convert these to absolute numbers (2,500,000,000) before any calculations.
+1. UNIT CONSISTENCY (CRITICAL - ABSOLUTE NUMBERS ONLY): ALL currency values (Revenue, EBITDA, FCF, Cash, Debt, EV, EquityValue) MUST be output as RAW ABSOLUTE NUMBERS (e.g., 2,500,000,000). NEVER use units like "2.5B" or "2500M". The frontend expects raw numbers for correct per-share calculations. Input may be formatted (e.g., "$2.5B" or "â‚¹600.32B") - you MUST convert these to absolute numbers (2,500,000,000) before any calculations.
 2. SHARES OUTSTANDING: If not provided, calculate as: SharesOutstanding = MarketCap / CurrentPrice. Use MarketCap in same units as Revenue.
 3. FCF CALCULATION & CONSISTENCY:
-   - NOPAT = EBIT × (1 - TaxRate)
+   - NOPAT = EBIT Ã— (1 - TaxRate)
    - FCF = NOPAT + Depreciation - CapEx - ChangeInNWC
    - CapEx MUST be negative (cash outflow)
-   - pvFCFs = Σ(FCF_YearN / (1+WACC)^N) for N=1 to 5
+   - pvFCFs = Î£(FCF_YearN / (1+WACC)^N) for N=1 to 5
    - VERIFICATION: Recalculate pvFCFs from the 5 projection years. The displayed sum MUST match the calculated pvFCFs value.
-4. TERMINAL VALUE FORMULA (CRITICAL): TV = FCF_Year5 × (1 + TerminalGrowth/100) / ((WACC/100) - (TerminalGrowth/100)). Example: If FCF5=2.5B, WACC=10%, TGR=2.5%, then TV = 2.5 × 1.025 / (0.10 - 0.025) = 34.17B. TV MUST be POSITIVE.
+4. TERMINAL VALUE FORMULA (CRITICAL): TV = FCF_Year5 Ã— (1 + TerminalGrowth/100) / ((WACC/100) - (TerminalGrowth/100)). Example: If FCF5=2.5B, WACC=10%, TGR=2.5%, then TV = 2.5 Ã— 1.025 / (0.10 - 0.025) = 34.17B. TV MUST be POSITIVE.
 5. DISCOUNT FACTORS: Year 1 = 1/(1+WACC), Year 2 = 1/(1+WACC)^2, etc. Compute PV for each FCF year.
-6. ENTERPRISE VALUE: EV = PV of FCFs (years 1-5) + PV of Terminal Value. If this is negative, your inputs are wrong — recalculate. Healthy companies MUST have positive EV.
+6. ENTERPRISE VALUE: EV = PV of FCFs (years 1-5) + PV of Terminal Value. If this is negative, your inputs are wrong â€” recalculate. Healthy companies MUST have positive EV.
 7. EQUITY VALUE (GUARD AGAINST NEGATIVE):
    - Step 1: Calculate Enterprise Value: EV = PV(FCFs_Y1-5) + PV(TerminalValue)
    - Step 2: Calculate Equity Value: EquityValue = EV + Cash - Debt
-   - Step 3: If EquityValue < 0 (high leverage), set EquityValue = Math.max(EV × 0.5, MarketCap × 0.1) to reflect distress but keep positive
+   - Step 3: If EquityValue < 0 (high leverage), set EquityValue = Math.max(EV Ã— 0.5, MarketCap Ã— 0.1) to reflect distress but keep positive
    - Step 4: EquityValue MUST be positive before calculating per-share value
 8. INTRINSIC VALUE (NEVER NEGATIVE): intrinsicValuePerShare = Math.max(EquityValue / SharesOutstanding, 0.01). NEVER return negative intrinsic value.
 9. P/E (TTM) CALCULATION:
    - P/E (TTM) = CurrentPrice / EPS(TTM)
    - EPS(TTM) = NetIncome(TTM) / SharesOutstanding
-   - If EPS data not provided, estimate: EPS = (Revenue × NetMargin) / SharesOutstanding
+   - If EPS data not provided, estimate: EPS = (Revenue Ã— NetMargin) / SharesOutstanding
    - Use provided Price/Earnings ratio d.pe from input data if available
 10. MARGIN OF SAFETY: marginOfSafety = ((intrinsicValuePerShare - ${price}) / intrinsicValuePerShare) * 100. Range: -100% to +100%.
 11. UPSIDE: upside = ((intrinsicValuePerShare - ${price}) / ${price}) * 100.
@@ -175,49 +175,49 @@ MATH RULES (violations = unusable output):
 15. REALISTIC INTRINSIC VALUE TARGETING:
     - Compare your output to known institutional targets (e.g., Alpha Spread, analyst consensus)
     - If gap >30%, iterate on WACC and TGR until target aligns within 10-15%
-    - Final intrinsic value should reflect: Current Price × (1 + Market-Implied Growth Rate), not pure textbook DCF
+    - Final intrinsic value should reflect: Current Price Ã— (1 + Market-Implied Growth Rate), not pure textbook DCF
 
 16. GROWTH J-CURVE MODELING (CAPEX PAYOFF STRUCTURE):
     - Model the J-Curve where heavy CapEx in Years 1-2 creates negative/weak FCF initially
     - FCF breaks positive in Year 3 as capex converts to revenue
     - Years 4-5 show accelerated FCF growth as infrastructure becomes productive
-    - Formula: Year 1-2 Growth = TGR × 0.5, Year 3 = TGR × 1.0, Year 4 = TGR × 1.5, Year 5 = TGR × 1.8
+    - Formula: Year 1-2 Growth = TGR Ã— 0.5, Year 3 = TGR Ã— 1.0, Year 4 = TGR Ã— 1.5, Year 5 = TGR Ã— 1.8
     - Example Tata Power: Year 1-2 (capex heavy, FCF flat), Year 3-5 (renewable capacity online, FCF +25-30% annually)
     - This captures the "heavy investment now, massive payoff later" dynamic
 
 17. DYNAMIC WACC CALCULATION:
     - Calculate WACC based on risk profile, NOT hardcoded 10%:
-    - Base: Risk-Free Rate + (Beta × Market Risk Premium)
+    - Base: Risk-Free Rate + (Beta Ã— Market Risk Premium)
     - Adjust: Lower WACC for utilities (8.0-8.5%), higher for cyclical stocks (10-11%)
     - Use provided Beta from input data
-    - Example Tata Power (Utility, Beta ~0.8): WACC = 4.5% + (0.8 × 5.5%) = 8.9%, rounded to 8.5%
+    - Example Tata Power (Utility, Beta ~0.8): WACC = 4.5% + (0.8 Ã— 5.5%) = 8.9%, rounded to 8.5%
 
 18. TERMINAL YEAR CAPEX CONVERGENCE (INSTITUTIONAL BEST PRACTICE):
     - In the terminal year (Year 5), CapEx should converge toward Depreciation as company reaches steady-state
     - This prevents valuation decay in the Gordon Growth Model
-    - Formula: convergedCapEx = baseTerminalCapEx × (1 - convergenceFactor) + Depreciation × convergenceFactor
+    - Formula: convergedCapEx = baseTerminalCapEx Ã— (1 - convergenceFactor) + Depreciation Ã— convergenceFactor
     - Where convergenceFactor = 0.9 (90% convergence to parity)
-    - Example: If Year 5 Depreciation = 500M, base CapEx = 750M, convergedCapEx = 750 × 0.1 + 500 × 0.9 = 525M
+    - Example: If Year 5 Depreciation = 500M, base CapEx = 750M, convergedCapEx = 750 Ã— 0.1 + 500 Ã— 0.9 = 525M
     - CapEx MUST be negative in FCF calculation: Year 5 CapEx = -(convergedCapEx)
-    - This ensures Terminal Value reflects maintenance CapEx ≈ Depreciation, not growth CapEx
+    - This ensures Terminal Value reflects maintenance CapEx â‰ˆ Depreciation, not growth CapEx
 
 INSTITUTIONAL VALUATION PROTOCOL (V10.0) - THE "NO-DASH" RULE
 
 ### 1. DATA EXTRACTION & RECOVERY (CRITICAL - NEVER LEAVE BLANK)
-- **The "No-Dash" Rule:** You must NOT return "—" for PE, ROE, ROCE, EPS, or Current Ratio.
+- **The "No-Dash" Rule:** You must NOT return "â€”" for PE, ROE, ROCE, EPS, or Current Ratio.
 - **Manual Calculation:** If the API fails, you MUST derive these:
   * **PE (TTM)** = Current Price / EPS (TTM)
-  * **ROE** = Net Income / Total Equity × 100
-  * **ROCE** = EBIT / (Total Assets - Current Liabilities) × 100
+  * **ROE** = Net Income / Total Equity Ã— 100
+  * **ROCE** = EBIT / (Total Assets - Current Liabilities) Ã— 100
   * **Current Ratio** = Total Current Assets / Total Current Liabilities
   * **EPS (TTM)** = Net Income / Shares Outstanding
-- **Unit Scale:** Force ALL currency values (Revenue, EBITDA, FCF, Debt, Cash) into **Millions** (e.g., ₹1.31T = 1,310,000). The frontend expects absolute numbers.
-- **Example:** Tata Power with NetIncome=₹45B, TotalEquity=₹300B → ROE = 15%
+- **Unit Scale:** Force ALL currency values (Revenue, EBITDA, FCF, Debt, Cash) into **Millions** (e.g., â‚¹1.31T = 1,310,000). The frontend expects absolute numbers.
+- **Example:** Tata Power with NetIncome=â‚¹45B, TotalEquity=â‚¹300B â†’ ROE = 15%
 - **Quality Check:** ROE>25% or ROCE>50% requires verification against sector norms.
 
 ### 2. GROWTH RAMP & TERMINAL LOGIC
 - **Infrastructure J-Curve:** For companies with high CapEx (like Tata Power), model an **increasing FCF ramp** in Years 3-5 as projects go live.
-- **Terminal Convergence:** In Year 5, set CapEx equal to Depreciation (CapEx ≈ Depreciation) to prevent "Valuation Decay." This reclaims billions in terminal value.
+- **Terminal Convergence:** In Year 5, set CapEx equal to Depreciation (CapEx â‰ˆ Depreciation) to prevent "Valuation Decay." This reclaims billions in terminal value.
 
 ### 3. QUALITY SCORE SYSTEM
 - Calculate Quality Score = ROE + ROCE
@@ -226,10 +226,10 @@ INSTITUTIONAL VALUATION PROTOCOL (V10.0) - THE "NO-DASH" RULE
 - Current Ratio > 3: Lower WACC by 1% (liquidity reduces risk)
 
 GROWTH CONTEXT & PEG RULE (CRITICAL):
-- Calculate PEG Ratio = PE / (RevenueGrowth × 100)
+- Calculate PEG Ratio = PE / (RevenueGrowth Ã— 100)
 - If PEG < 0.5: Company is deeply undervalued relative to growth
-- Rule: For PEG < 0.5, Terminal Growth Rate (TGR) MUST be ≥ 5%, NOT the textbook 2.5%
-- Example: P/E = 12x, RevenueGrowth = 30% → PEG = 0.4 → Use TGR = 5.5-6%
+- Rule: For PEG < 0.5, Terminal Growth Rate (TGR) MUST be â‰¥ 5%, NOT the textbook 2.5%
+- Example: P/E = 12x, RevenueGrowth = 30% â†’ PEG = 0.4 â†’ Use TGR = 5.5-6%
 
 MULTIPLES EXPANSION SCENARIO (CRITICAL):
 - If P/E is LOW (<15x) but ROCE is HIGH (>30%), model Multiple Expansion in Terminal Value
@@ -237,7 +237,7 @@ MULTIPLES EXPANSION SCENARIO (CRITICAL):
 - Higher terminal multiple assumption: Use TGR at upper range (e.g., 5% vs 3%)
 - This captures the re-rating potential when market recognizes quality
 
-SENSITIVITY ANALYSIS (MUST OUTPUT 5×5 MATRIX with rowHeaders/waccRange and colHeaders/tgrRange):
+SENSITIVITY ANALYSIS (MUST OUTPUT 5Ã—5 MATRIX with rowHeaders/waccRange and colHeaders/tgrRange):
 - Base: wacc = computed WACC percent (e.g., 8.5), tgr = computed Terminal Growth Rate (e.g., 4.5)
 - rowHeaders (WACC values): MUST be [7.0, 8.0, 9.0, 10.0, 11.0] (5 values)
 - colHeaders (Terminal Growth values): MUST be [1.5, 2.0, 2.5, 3.0, 3.5] (5 values)
@@ -248,16 +248,16 @@ SENSITIVITY ANALYSIS (MUST OUTPUT 5×5 MATRIX with rowHeaders/waccRange and colH
   4. Equity Value = (Sum of PVs) - Net Debt + Cash (in Millions)
   5. Intrinsic Value Per Share = Equity Value / Shares Outstanding
 - For EACH combination (wacc in rowHeaders, tgr in colHeaders):
-   * TV = FCF_Year5 × (1 + tgr/100) / ((wacc/100) - (tgr/100))
+   * TV = FCF_Year5 Ã— (1 + tgr/100) / ((wacc/100) - (tgr/100))
    * EV = PV_of_FCFs + (TV / (1+wacc/100)^5)
    * Equity = EV + Cash - Debt
    * ValuePerShare = Equity / SharesOutstanding
-- Return EXACTLY 5 rows × 5 columns of per-share values
+- Return EXACTLY 5 rows Ã— 5 columns of per-share values
 - JSON SCHEMA requirement: sensitivityTable MUST include "rowHeaders" (WACC array), "colHeaders" (TGR array), and "grid" (5x5 array of intrinsic values)
 - REQUIRED: Return valid numbers in ALL 25 cells. NO nulls. NO "N/A". NO placeholders.
 - CORE RULE: All currency outputs MUST be in MILLIONS (1 Billion = 1000) to maintain per-share valuation accuracy.
 
-RETURN ONLY THIS JSON STRUCTURE — NO MARKDOWN — replace ALL values with real computed numbers for ${ticker}:
+RETURN ONLY THIS JSON STRUCTURE â€” NO MARKDOWN â€” replace ALL values with real computed numbers for ${ticker}:
 {
   "assumptions": {
     "wacc": <computed_wacc_percent>,
@@ -294,39 +294,142 @@ RETURN ONLY THIS JSON STRUCTURE — NO MARKDOWN — replace ALL values with real
     ]
   },
   "keyRisksToModel": [
-    "<RISK 1: specific to ${ticker}'s balance sheet — e.g. if Debt/Equity is high, state exact D/E ratio and how a 100bps rate rise inflates WACC by X% and compresses intrinsic value by Y%>",
-    "<RISK 2: specific to ${ticker}'s revenue or margin profile — e.g. if margins are thin or declining, cite the actual margin % and how a 200bps compression in EBITDA margin reduces FCF by how much in absolute terms>",
-    "<RISK 3: specific to ${ticker}'s FCF quality or capex cycle — e.g. if FCF is negative or capex-intensive, cite actual FCF figure and how a capex overrun of 10-15% delays FCF breakeven by how many years>",
-    "<RISK 4: specific to ${ticker}'s sector or macro exposure — e.g. if Beta > 1.0, cite exact beta and how a 10% market downturn statistically moves the stock; or cite a specific regulatory/commodity risk with quantified revenue exposure>",
-    "<RISK 5: specific to ${ticker}'s growth assumptions in this model — e.g. if TGR = X%, explain what revenue CAGR is required to justify it and what happens to intrinsic value if growth comes in 2-3% below the model>"
+    "<RISK 1: specific to ${ticker}'s balance sheet â€” e.g. if Debt/Equity is high, state exact D/E ratio and how a 100bps rate rise inflates WACC by X% and compresses intrinsic value by Y%>",
+    "<RISK 2: specific to ${ticker}'s revenue or margin profile â€” e.g. if margins are thin or declining, cite the actual margin % and how a 200bps compression in EBITDA margin reduces FCF by how much in absolute terms>",
+    "<RISK 3: specific to ${ticker}'s FCF quality or capex cycle â€” e.g. if FCF is negative or capex-intensive, cite actual FCF figure and how a capex overrun of 10-15% delays FCF breakeven by how many years>",
+    "<RISK 4: specific to ${ticker}'s sector or macro exposure â€” e.g. if Beta > 1.0, cite exact beta and how a 10% market downturn statistically moves the stock; or cite a specific regulatory/commodity risk with quantified revenue exposure>",
+    "<RISK 5: specific to ${ticker}'s growth assumptions in this model â€” e.g. if TGR = X%, explain what revenue CAGR is required to justify it and what happens to intrinsic value if growth comes in 2-3% below the model>"
   ],
   "analystNote": "<2-3 sentence summary of this specific DCF model's key assumptions and confidence for ${ticker}>"
 }
 
-CRITICAL: DO NOT copy the <placeholder> tags — replace every one with real computed values for ${ticker}.
+CRITICAL: DO NOT copy the <placeholder> tags â€” replace every one with real computed values for ${ticker}.
 CRITICAL: keyRisksToModel MUST contain EXACTLY 5 risks. Each risk MUST:
   - Name the specific financial metric from the INPUT DATA above (e.g. actual D/E ratio, actual FCF, actual beta)
   - Quantify the downside impact on intrinsic value per share or WACC
   - Be specific to ${ticker}'s industry: "${d.sector || 'its sector'}" / "${d.industry || 'its industry'}"
-  - NOT be a generic statement like "regulatory risk" or "competition" — those are BANNED unless tied to a specific number
-  - Example GOOD risk: "With Debt/Equity at 1.82x and net debt of ₹3.1T, a 100bps rate increase raises WACC from 9.2% to 10.1%, compressing intrinsic value by approximately ₹220/share (-15%)"
-  - Example BAD risk (BANNED): "Regulatory risks in the energy sector" ← too vague, no numbers
+  - NOT be a generic statement like "regulatory risk" or "competition" â€” those are BANNED unless tied to a specific number
+  - Example GOOD risk: "With Debt/Equity at 1.82x and net debt of â‚¹3.1T, a 100bps rate increase raises WACC from 9.2% to 10.1%, compressing intrinsic value by approximately â‚¹220/share (-15%)"
+  - Example BAD risk (BANNED): "Regulatory risks in the energy sector" â† too vague, no numbers
 DO NOT use markdown fences. Return ONLY the JSON object.
 ${d.screenerPeers?.length > 0 ? `\nPeer context for ${ticker}: ${d.screenerPeers.slice(0, 5).map(p => p.name || p.ticker).join(', ')}` : ''}`,
   }
 }
 
+// â”€â”€â”€ Sector-specific thresholds â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function getSectorThresholds(sector) {
+  const s = (sector || '').toLowerCase()
+
+  if (s.includes('financial') || s.includes('bank') || s.includes('insurance') || s.includes('nbfc')) {
+    return { label: 'Financial Services',
+      debtEq:    { t: 'N/A (leverage is normal)', warnH: 20,  warnM: 12  },
+      curRatio:  { t: '1.0x',  warnH: 0.8,  warnM: 1.0, higher: true },
+      ndEbitda:  { t: '5.0x',  warnH: 8,    warnM: 5   },
+      intCov:    { t: '2.0x',  warnH: 1.5,  warnM: 2.0, higher: true },
+      dAssets:   { t: '70%',   warnH: 85,   warnM: 70  },
+      roe:       { t: '12%',   excl: 15,    good: 10   },
+      fcfMargin: { t: '10%',   excl: 15,    good: 8    },
+      netMargin: { t: '15%',   excl: 20,    good: 10   },
+      roce:      { t: '10%',   excl: 14,    good: 8    },
+    }
+  }
+  if (s.includes('utilit')) {
+    return { label: 'Utilities',
+      debtEq:    { t: '2.0x',  warnH: 3.5,  warnM: 2.0 },
+      curRatio:  { t: '1.0x',  warnH: 0.7,  warnM: 1.0, higher: true },
+      ndEbitda:  { t: '4.0x',  warnH: 6,    warnM: 4.5 },
+      intCov:    { t: '2.5x',  warnH: 1.5,  warnM: 2.5, higher: true },
+      dAssets:   { t: '60%',   warnH: 75,   warnM: 60  },
+      roe:       { t: '10%',   excl: 13,    good: 8    },
+      fcfMargin: { t: '12%',   excl: 18,    good: 10   },
+      netMargin: { t: '10%',   excl: 14,    good: 7    },
+      roce:      { t: '8%',    excl: 11,    good: 6    },
+    }
+  }
+  if (s.includes('real estate') || s.includes('reit')) {
+    return { label: 'Real Estate / REIT',
+      debtEq:    { t: '2.5x',  warnH: 4,    warnM: 2.5 },
+      curRatio:  { t: '1.0x',  warnH: 0.7,  warnM: 1.0, higher: true },
+      ndEbitda:  { t: '6.0x',  warnH: 9,    warnM: 7   },
+      intCov:    { t: '2.0x',  warnH: 1.5,  warnM: 2.0, higher: true },
+      dAssets:   { t: '55%',   warnH: 70,   warnM: 55  },
+      roe:       { t: '8%',    excl: 12,    good: 6    },
+      fcfMargin: { t: '20%',   excl: 30,    good: 15   },
+      netMargin: { t: '20%',   excl: 30,    good: 15   },
+      roce:      { t: '6%',    excl: 9,     good: 5    },
+    }
+  }
+  if (s.includes('energy') || s.includes('oil') || s.includes('gas')) {
+    return { label: 'Energy / O&G',
+      debtEq:    { t: '1.5x',  warnH: 2.5,  warnM: 1.5 },
+      curRatio:  { t: '1.2x',  warnH: 0.8,  warnM: 1.2, higher: true },
+      ndEbitda:  { t: '2.5x',  warnH: 4,    warnM: 2.5 },
+      intCov:    { t: '3.0x',  warnH: 2,    warnM: 3.0, higher: true },
+      dAssets:   { t: '45%',   warnH: 60,   warnM: 45  },
+      roe:       { t: '12%',   excl: 18,    good: 8    },
+      fcfMargin: { t: '10%',   excl: 15,    good: 5    },
+      netMargin: { t: '8%',    excl: 12,    good: 5    },
+      roce:      { t: '12%',   excl: 18,    good: 8    },
+    }
+  }
+  if (s.includes('tech') || s.includes('software') || s.includes('semicon') || s.includes('information')) {
+    return { label: 'Technology',
+      debtEq:    { t: '0.5x',  warnH: 1.5,  warnM: 0.8 },
+      curRatio:  { t: '2.0x',  warnH: 1.0,  warnM: 1.5, higher: true },
+      ndEbitda:  { t: '1.0x',  warnH: 2.5,  warnM: 1.5 },
+      intCov:    { t: '10x',   warnH: 5,    warnM: 8,   higher: true },
+      dAssets:   { t: '30%',   warnH: 50,   warnM: 35  },
+      roe:       { t: '20%',   excl: 30,    good: 15   },
+      fcfMargin: { t: '20%',   excl: 30,    good: 12   },
+      netMargin: { t: '15%',   excl: 25,    good: 8    },
+      roce:      { t: '20%',   excl: 30,    good: 12   },
+    }
+  }
+  if (s.includes('health') || s.includes('pharma') || s.includes('biotech')) {
+    return { label: 'Healthcare / Pharma',
+      debtEq:    { t: '0.8x',  warnH: 2.0,  warnM: 1.2 },
+      curRatio:  { t: '1.5x',  warnH: 1.0,  warnM: 1.5, higher: true },
+      ndEbitda:  { t: '2.0x',  warnH: 4.0,  warnM: 2.5 },
+      intCov:    { t: '5.0x',  warnH: 2.5,  warnM: 4.0, higher: true },
+      dAssets:   { t: '40%',   warnH: 60,   warnM: 45  },
+      roe:       { t: '15%',   excl: 25,    good: 10   },
+      fcfMargin: { t: '15%',   excl: 25,    good: 8    },
+      netMargin: { t: '12%',   excl: 20,    good: 7    },
+      roce:      { t: '15%',   excl: 25,    good: 10   },
+    }
+  }
+  if (s.includes('consumer') || s.includes('retail') || s.includes('food') || s.includes('beverag')) {
+    return { label: 'Consumer / Retail',
+      debtEq:    { t: '1.0x',  warnH: 2.5,  warnM: 1.5 },
+      curRatio:  { t: '1.5x',  warnH: 0.8,  warnM: 1.2, higher: true },
+      ndEbitda:  { t: '2.5x',  warnH: 4.5,  warnM: 3.0 },
+      intCov:    { t: '4.0x',  warnH: 2,    warnM: 3.0, higher: true },
+      dAssets:   { t: '40%',   warnH: 65,   warnM: 50  },
+      roe:       { t: '15%',   excl: 25,    good: 10   },
+      fcfMargin: { t: '8%',    excl: 12,    good: 5    },
+      netMargin: { t: '6%',    excl: 10,    good: 3    },
+      roce:      { t: '12%',   excl: 20,    good: 8    },
+    }
+  }
+  // Default: Industrials / Manufacturing / Conglomerate
+  return { label: 'Industrials / General',
+    debtEq:    { t: '1.0x',  warnH: 2.5,  warnM: 1.5 },
+    curRatio:  { t: '1.5x',  warnH: 0.8,  warnM: 1.2, higher: true },
+    ndEbitda:  { t: '3.0x',  warnH: 5,    warnM: 3.5 },
+    intCov:    { t: '3.0x',  warnH: 1.5,  warnM: 2.5, higher: true },
+    dAssets:   { t: '50%',   warnH: 70,   warnM: 55  },
+    roe:       { t: '12%',   excl: 18,    good: 8    },
+    fcfMargin: { t: '10%',   excl: 15,    good: 6    },
+    netMargin: { t: '8%',    excl: 12,    good: 4    },
+    roce:      { t: '12%',   excl: 18,    good: 8    },
+  }
+}
+
 function buildRiskPrompt(ticker, d) {
   const price = d.price?.toFixed?.(2) || 'N/A'
-  const pe = d.pe?.toFixed?.(2) || '—'
-  const fwdPe = d.forwardPE?.toFixed?.(2) || '—'
-  const evEbitda = d.evToEbitda?.toFixed?.(2) || '—'
-  const debtEq = d.debtToEquity?.toFixed?.(2) || '—'
-  const roe = d.roe ? (d.roe * 100).toFixed(2) + '%' : '—'
-  const currentRatio = d.currentRatio?.toFixed?.(2) || '—'
-  const fcfMargin = d.freeCashFlow && d.revenue
-    ? ((d.freeCashFlow / d.revenue) * 100).toFixed(1) + '%'
-    : '—'
+  const pe = d.pe?.toFixed?.(2) || 'â€”'
+  const fwdPe = d.forwardPE?.toFixed?.(2) || 'â€”'
+  const evEbitda = d.evToEbitda?.toFixed?.(2) || 'â€”'
 
   // Sector median from Screener.in industryPE (safe null-check)
   const industryPE = (d.screenerRatios?.industryPE != null)
@@ -336,19 +439,19 @@ function buildRiskPrompt(ticker, d) {
   const sectorMedianFwdPE  = industryPE != null ? `${(industryPE * 0.9).toFixed(1)}x`       : '<sector_median_fwd_pe>x'
   const sectorMedianEvEbitda = industryPE != null ? `${(industryPE * 0.65).toFixed(1)}x`    : '<sector_median_ev_ebitda>x'
 
-  // Build plain-text peer context for the INJECTED DATA section (NOT inside JSON template)
+  // â”€â”€ Peer context â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const buildPeerContext = () => {
     const peers = d.screenerPeers?.filter(p => p.name && p.pe != null)
     if (!peers?.length) return ''
     const rows = peers.slice(0, 5).map(p => {
-      const name = String(p.name).replace(/["\\]/g, "'") // sanitise any quotes
+      const name = String(p.name).replace(/["\\]/g, "'")
       const pePct = Number(p.pe).toFixed(1)
       return `  - ${name} (P/E: ${pePct}x, MCap: ${fmtNumber(p.marketCap)})`
     }).join('\n')
-    return `\nSCREENER PEER DATA — use these for peerBenchmarks (do NOT hallucinate other companies):\n${rows}`
+    return `\nSCREENER PEER DATA â€” use these for peerBenchmarks (do NOT hallucinate other companies):\n${rows}`
   }
 
-  // Technicals — read ma50/ma200 aliases first, then raw Yahoo fields
+  // â”€â”€ Technicals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const ma50  = d.ma50  || d.fiftyDayAverage      || 0
   const ma200 = d.ma200 || d.twoHundredDayAverage  || 0
   const weekHigh52 = d.weekHigh52 || 0
@@ -373,60 +476,115 @@ function buildRiskPrompt(ticker, d) {
     if (ma50 > ma200 && d.price > ma50) trend = 'BULLISH'
     else if (ma50 < ma200 && d.price < ma50) trend = 'BEARISH'
   }
-
   const support    = ma50  > 0 ? ma50  : weekLow52
   const resistance = ma200 > 0 ? ma200 : weekHigh52
 
+  // â”€â”€ Sector thresholds â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const th = getSectorThresholds(d.sector)
+
+  // â”€â”€ Server-side ratio computation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const safe = (v) => (v !== null && v !== undefined && isFinite(v) ? v : null)
+
+  // Leverage ratios
+  const debtEqNum     = safe(d.debtToEquity)
+  const curRatioNum   = safe(d.currentRatio)
+  const quickRatioNum = safe(d.quickRatio)
+  const ebitda        = safe(d.ebitda)
+  const totalDebt     = safe(d.totalDebt)
+  const totalCash     = safe(d.totalCash)
+  const totalAssets   = safe(d.totalAssets)
+  const intExp        = safe(d.interestExpense) // usually negative from Yahoo
+  const revenue       = safe(d.revenue)
+  const opMargin      = safe(d.operatingMargin)
+  const ebit          = revenue && opMargin ? revenue * opMargin : null
+
+  const netDebt       = totalDebt !== null && totalCash !== null ? totalDebt - totalCash : null
+  const ndEbitdaNum   = netDebt !== null && ebitda && ebitda > 0 ? netDebt / ebitda : null
+  const intCovNum     = ebit && intExp && intExp !== 0 ? ebit / Math.abs(intExp) : null
+  const dAssetsNum    = totalDebt !== null && totalAssets && totalAssets > 0 ? (totalDebt / totalAssets) * 100 : null
+
+  // Quality ratios
+  const roeNum        = safe(d.roe)   // decimal (0.12 = 12%)
+  const fcfNum        = safe(d.freeCashFlow)
+  const fcfMarginNum  = fcfNum && revenue && revenue > 0 ? (fcfNum / revenue) * 100 : null
+  const netMarginNum  = safe(d.profitMargin) !== null ? d.profitMargin * 100 : null
+  // ROCE = EBIT / Capital Employed; we approximate Capital Employed = Total Assets - Current Liabilities
+  // Use totalAssets as proxy if current liabilities unavailable
+  const roceNum       = ebit && totalAssets && totalAssets > 0 ? (ebit / totalAssets) * 100 : null
+
+  // â”€â”€ Formatting helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const fmt = (v, digits, suffix) => v !== null ? `${v.toFixed(digits)}${suffix}` : 'N/A'
+  const fmtX = (v, d = 2) => fmt(v, d, 'x')
+  const fmtP = (v, d = 1) => fmt(v, d, '%')
+
+  // Risk rating: higher value = worse (e.g. D/E, debt ratios)
+  const riskHigh = (v, wH, wM) => v === null ? 'MEDIUM' : v > wH ? 'HIGH' : v > wM ? 'MEDIUM' : 'LOW'
+  // Risk rating: lower value = worse (e.g. current ratio, interest coverage)
+  const riskLow  = (v, wH, wM) => v === null ? 'MEDIUM' : v < wH ? 'HIGH' : v < wM ? 'MEDIUM' : 'LOW'
+
+  // Quality rating: higher = better
+  const qual = (v, excl, good) => v === null ? 'AVERAGE' : v >= excl ? 'EXCELLENT' : v >= good ? 'GOOD' : v >= 0 ? 'AVERAGE' : 'POOR'
+
+  // Pre-computed display values
+  const deqDisplay  = debtEqNum !== null ? `${debtEqNum.toFixed(2)}x` : 'N/A'
+  const curDisplay  = curRatioNum !== null ? `${curRatioNum.toFixed(2)}x` : 'N/A'
+  const ndEDisplay  = ndEbitdaNum !== null ? `${ndEbitdaNum.toFixed(2)}x` : 'N/A'
+  const icDisplay   = intCovNum !== null ? `${intCovNum.toFixed(2)}x` : 'N/A'
+  const daDisplay   = dAssetsNum !== null ? `${dAssetsNum.toFixed(1)}%` : 'N/A'
+  const roeDisplay  = roeNum !== null ? `${(roeNum * 100).toFixed(1)}%` : 'â€”'
+  const fcfDisplay  = fcfMarginNum !== null ? `${fcfMarginNum.toFixed(1)}%` : 'â€”'
+  const nmDisplay   = netMarginNum !== null ? `${netMarginNum.toFixed(1)}%` : 'â€”'
+  const roceDisplay = roceNum !== null ? `${roceNum.toFixed(1)}%` : 'â€”'
+
   return {
     system: 'You are a Quantitative Risk Analyst. Return ONLY valid JSON. NEVER use markdown backticks.',
-    user: `Analyze risk metrics and financial health for ${ticker}.
+    user: `Analyze risk metrics and financial health for ${ticker} (${d.sector || 'General'}).
 
-INJECTED FINANCIAL DATA (MUST USE THESE EXACT VALUES):
+SECTOR: ${d.sector || 'General'} â€” ${th.label} norms applied.
+
+INJECTED FINANCIAL DATA:
 - Current Price: ${price}
 - Market Cap: ${fmtNumber(d.marketCap)}
 - P/E (TTM): ${pe}x
 - Forward P/E: ${fwdPe}x
-- EV/EBITDA: ${evEbitda}
-- Debt to Equity: ${debtEq}
-- Total Debt: ${fmtNumber(d.totalDebt)}
-- Total Cash: ${fmtNumber(d.totalCash)}
-- Total Assets: ${fmtNumber(d.totalAssets || null)}
-- EBITDA: ${fmtNumber(d.ebitda)}
-- Interest Expense: ${fmtNumber(d.interestExpense || null)}
-- Net Income: ${fmtNumber(d.netIncome || null)}
-- ROE: ${roe}
-- Free Cash Flow: ${fmtNumber(d.freeCashFlow)}
-- FCF Margin: ${fcfMargin}
-- Current Ratio: ${currentRatio}
-- Quick Ratio: ${d.quickRatio?.toFixed?.(2) || 'N/A'}
-- Beta: ${d.beta?.toFixed?.(2) || '—'}
-- Avg Volume: ${fmtNumber(d.avgVolume)}
-- Sector/Industry Median P/E: ${sectorMedianPE}${industryPE != null ? ' — USE THIS EXACT value for sectorMedian of P/E (TTM).' : ' — estimate from sector knowledge.'}
+- EV/EBITDA: ${evEbitda}x
+- Beta: ${d.beta?.toFixed?.(2) || 'â€”'}
+- Sector/Industry Median P/E: ${sectorMedianPE}${industryPE != null ? ' â€” USE THIS EXACT value.' : ''}
 ${buildPeerContext()}
-INJECTED TECHNICAL DATA (PRE-CALCULATED):
+PRE-COMPUTED RATIOS (use these exact values in the JSON â€” do NOT recompute):
+Leverage:
+  Debt/Equity    = ${deqDisplay}  (sector threshold: ${th.debtEq.t})
+  Current Ratio  = ${curDisplay}  (sector threshold: ${th.curRatio.t})
+  Net Debt/EBITDA= ${ndEDisplay}  (sector threshold: ${th.ndEbitda.t})
+  Interest Cover = ${icDisplay}   (sector threshold: ${th.intCov.t})
+  Debt/Assets    = ${daDisplay}   (sector threshold: ${th.dAssets.t})
+Quality:
+  ROE            = ${roeDisplay}  (sector benchmark: ${th.roe.t})
+  FCF Margin     = ${fcfDisplay}  (sector benchmark: ${th.fcfMargin.t})
+  Net Margin     = ${nmDisplay}   (sector benchmark: ${th.netMargin.t})
+  ROCE           = ${roceDisplay} (sector benchmark: ${th.roce.t})
+
+INJECTED TECHNICAL DATA:
 - Trend: ${trend}
 - Price vs 50DMA: ${priceVs50DMA}%
 - Price vs 200DMA: ${priceVs200DMA}%
 - 52-Week Position: ${weekPosition52}%
-- 52-Week Range: ${weekLow52} - ${weekHigh52}
+- 52-Week Range: ${weekLow52} â€“ ${weekHigh52}
 - Volume Signal: ${volumeSignal}
-- Support Level: ${support}
-- Resistance Level: ${resistance}
+- Support: ${support}, Resistance: ${resistance}
 
-CRITICAL RULES:
-1. USE ALL injected data EXACTLY as provided. Do NOT invent new values.
-2. Risk Factors MUST analyze: Liquidity (Current Ratio), Leverage (D/E), Valuation (P/E).
-3. REPLACE all <placeholder> tags with YOUR analysis. Generic descriptions are FORBIDDEN.
-4. overallRiskScore & overallQualityScore MUST be integers 1-10.
-5. peerBenchmarks MUST include 3 real peer companies from ${d.sector || 'same sector'} in ${d.currency || 'USD'}.
-6. All arrays must have at least 2-3 items with realistic data.
-7. Use the SCREENER PEER DATA above (if provided) for peerBenchmarks company names and P/E.
+RULES:
+1. Use ALL injected/pre-computed values EXACTLY â€” no recomputation.
+2. riskSummary = 2 sentences using actual numbers above.
+3. riskFactors = 4 items, each analyzing a specific ratio with sector context.
+4. overallRiskScore & overallQualityScore = integers 1-10.
+5. Use SCREENER PEER DATA for peerBenchmarks if provided.
 
-Return ONLY JSON matching this EXACT structure (field names must match exactly):
+Return ONLY JSON:
 {
   "overallRiskScore": ${Math.max(1, Math.min(10, Math.round((d.beta || 1) * 5)))},
-  "overallQualityScore": ${Math.max(1, Math.min(10, Math.round((d.roe || 0.12) * 100 / 2)))},
-  "riskSummary": "<2-sentence institutional risk summary using injected data>",
+  "overallQualityScore": ${Math.max(1, Math.min(10, Math.round((roeNum || 0.12) * 100 / 2)))},
+  "riskSummary": "<2-sentence institutional risk summary citing actual ratios>",
   "technicals": {
     "trend": "${trend}",
     "momentum": "${Number(priceVs50DMA) > 0 ? 'UPTREND' : Number(priceVs50DMA) < 0 ? 'DOWNTREND' : 'NEUTRAL'}",
@@ -434,46 +592,45 @@ Return ONLY JSON matching this EXACT structure (field names must match exactly):
     "priceVs50DMA": "${priceVs50DMA}",
     "priceVs200DMA": "${priceVs200DMA}",
     "weekPosition52": "${weekPosition52}",
-    "keyLevels": {
-      "support": ${support},
-      "resistance": ${resistance}
-    }
+    "keyLevels": { "support": ${support}, "resistance": ${resistance} }
   },
   "valuationRatios": [
-    {"metric": "P/E (TTM)", "value": "${pe}x", "sectorMedian": "${sectorMedianPE}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence vs sector median>"},
-    {"metric": "Forward P/E", "value": "${fwdPe}x", "sectorMedian": "${sectorMedianFwdPE}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence on growth-adjusted valuation>"},
-    {"metric": "EV/EBITDA", "value": "${evEbitda}x", "sectorMedian": "${sectorMedianEvEbitda}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence on EV/EBITDA vs sector>"}
+    {"metric": "P/E (TTM)", "value": "${pe}x", "sectorMedian": "${sectorMedianPE}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence>"},
+    {"metric": "Forward P/E", "value": "${fwdPe}x", "sectorMedian": "${sectorMedianFwdPE}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence>"},
+    {"metric": "EV/EBITDA", "value": "${evEbitda}x", "sectorMedian": "${sectorMedianEvEbitda}", "assessment": "<CHEAP|FAIR|EXPENSIVE>", "note": "<one sentence>"}
   ],
   "qualityRatios": [
-    {"metric": "ROE", "value": "${roe}", "benchmark": "12.0%", "rating": "${d.roe > 0.15 ? 'EXCELLENT' : d.roe > 0.10 ? 'GOOD' : 'AVERAGE'}"},
-    {"metric": "FCF Margin", "value": "${fcfMargin}", "benchmark": "10%", "rating": "<EXCELLENT|GOOD|AVERAGE|POOR>"},
-    {"metric": "Net Margin", "value": "${fmtPercent(d.profitMargin)}", "benchmark": "8%", "rating": "<EXCELLENT|GOOD|AVERAGE|POOR>"},
-    {"metric": "ROCE", "value": "<compute: EBIT / (TotalAssets - CurrentLiabilities) × 100 or estimate from sector>", "benchmark": "15%", "rating": "<EXCELLENT|GOOD|AVERAGE|POOR>"}
+    {"metric": "ROE", "value": "${roeDisplay}", "benchmark": "${th.roe.t}", "rating": "${qual(roeNum ? roeNum * 100 : null, th.roe.excl, th.roe.good)}"},
+    {"metric": "FCF Margin", "value": "${fcfDisplay}", "benchmark": "${th.fcfMargin.t}", "rating": "${qual(fcfMarginNum, th.fcfMargin.excl, th.fcfMargin.good)}"},
+    {"metric": "Net Margin", "value": "${nmDisplay}", "benchmark": "${th.netMargin.t}", "rating": "${qual(netMarginNum, th.netMargin.excl, th.netMargin.good)}"},
+    {"metric": "ROCE", "value": "${roceDisplay}", "benchmark": "${th.roce.t}", "rating": "${qual(roceNum, th.roce.excl, th.roce.good)}"}
   ],
   "leverageRatios": [
-    {"metric": "Debt/Equity", "value": "${debtEq === '—' ? 'N/A' : debtEq + 'x'}", "threshold": "1.0x", "risk": "${Number(debtEq) > 1.5 ? 'HIGH' : Number(debtEq) > 0.8 ? 'MEDIUM' : 'LOW'}"},
-    {"metric": "Current Ratio", "value": "${currentRatio === '—' ? 'N/A' : currentRatio + 'x'}", "threshold": "1.5x", "risk": "${Number(currentRatio) < 1 ? 'HIGH' : Number(currentRatio) < 1.5 ? 'MEDIUM' : 'LOW'}"},
-    {"metric": "Net Debt / EBITDA", "value": "<compute: (TotalDebt - Cash) / EBITDA, format as Xx>", "threshold": "3.0x", "risk": "<LOW|MEDIUM|HIGH based on result>"},
-    {"metric": "Interest Coverage", "value": "<compute: EBIT / InterestExpense if available, else estimate from sector norms, format as Xx>", "threshold": "3.0x", "risk": "<LOW|MEDIUM|HIGH — HIGH if coverage < 2x>"},
-    {"metric": "Debt / Assets", "value": "<compute: TotalDebt / TotalAssets if available, else estimate, format as X%>", "threshold": "50%", "risk": "<LOW|MEDIUM|HIGH>"}
+    {"metric": "Debt/Equity", "value": "${deqDisplay}", "threshold": "${th.debtEq.t}", "risk": "${riskHigh(debtEqNum, th.debtEq.warnH, th.debtEq.warnM)}"},
+    {"metric": "Current Ratio", "value": "${curDisplay}", "threshold": "${th.curRatio.t}", "risk": "${riskLow(curRatioNum, th.curRatio.warnH, th.curRatio.warnM)}"},
+    {"metric": "Net Debt/EBITDA", "value": "${ndEDisplay}", "threshold": "${th.ndEbitda.t}", "risk": "${riskHigh(ndEbitdaNum, th.ndEbitda.warnH, th.ndEbitda.warnM)}"},
+    {"metric": "Interest Coverage", "value": "${icDisplay}", "threshold": "${th.intCov.t}", "risk": "${riskLow(intCovNum, th.intCov.warnH, th.intCov.warnM)}"},
+    {"metric": "Debt/Assets", "value": "${daDisplay}", "threshold": "${th.dAssets.t}", "risk": "${riskHigh(dAssetsNum, th.dAssets.warnH, th.dAssets.warnM)}"}
   ],
   "riskFactors": [
-    {"risk": "Liquidity Risk", "severity": "${Number(currentRatio) < 1 ? 'HIGH' : Number(currentRatio) < 1.5 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "<analyze current ratio ${currentRatio} with sector context>"},
-    {"risk": "Leverage Risk", "severity": "${Number(debtEq) > 1.5 ? 'HIGH' : Number(debtEq) > 0.8 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "<analyze D/E of ${debtEq} with sector context>"},
-    {"risk": "Valuation Risk", "severity": "${Number(pe) > 30 ? 'HIGH' : Number(pe) > 20 ? 'MEDIUM' : 'LOW'}", "likelihood": "MEDIUM", "detail": "<analyze P/E ${pe}x vs sector with context>"}
+    {"risk": "Leverage Risk", "severity": "${riskHigh(debtEqNum, th.debtEq.warnH, th.debtEq.warnM)}", "likelihood": "MEDIUM", "detail": "<analyze D/E ${deqDisplay} vs sector threshold ${th.debtEq.t} for ${d.sector}>"},
+    {"risk": "Liquidity Risk", "severity": "${riskLow(curRatioNum, th.curRatio.warnH, th.curRatio.warnM)}", "likelihood": "MEDIUM", "detail": "<analyze current ratio ${curDisplay} vs threshold ${th.curRatio.t} for ${d.sector}>"},
+    {"risk": "Debt Serviceability", "severity": "${riskLow(intCovNum, th.intCov.warnH, th.intCov.warnM)}", "likelihood": "MEDIUM", "detail": "<analyze interest coverage ${icDisplay} vs threshold ${th.intCov.t}>"},
+    {"risk": "Valuation Risk", "severity": "<LOW|MEDIUM|HIGH based on P/E vs sector>", "likelihood": "MEDIUM", "detail": "<analyze P/E ${pe}x vs sector median ${sectorMedianPE}>"}
   ],
   "peerBenchmarks": [
-    {"ticker": "<peer1_ticker>", "name": "<peer1_company_name>", "pe": "<peer1_pe>x", "evEbitda": "<peer1_ev_ebitda>x", "margin": "<peer1_net_margin>%"},
-    {"ticker": "<peer2_ticker>", "name": "<peer2_company_name>", "pe": "<peer2_pe>x", "evEbitda": "<peer2_ev_ebitda>x", "margin": "<peer2_net_margin>%"},
-    {"ticker": "<peer3_ticker>", "name": "<peer3_company_name>", "pe": "<peer3_pe>x", "evEbitda": "<peer3_ev_ebitda>x", "margin": "<peer3_net_margin>%"}
+    {"ticker": "<peer1_ticker>", "name": "<peer1_name>", "pe": "<pe>x", "evEbitda": "<ev>x", "margin": "<margin>%"},
+    {"ticker": "<peer2_ticker>", "name": "<peer2_name>", "pe": "<pe>x", "evEbitda": "<ev>x", "margin": "<margin>%"},
+    {"ticker": "<peer3_ticker>", "name": "<peer3_name>", "pe": "<pe>x", "evEbitda": "<ev>x", "margin": "<margin>%"}
   ]
 }`
   }
 }
+}
 
 /**
  * ============================================================================
- * 🔒 STRICT CODE FREEZE IN EFFECT 🔒
+ * ðŸ”’ STRICT CODE FREEZE IN EFFECT ðŸ”’
  * MODULE: Investment Thesis & News Sentiment
  * STATUS: Production Ready & Validated
  *
