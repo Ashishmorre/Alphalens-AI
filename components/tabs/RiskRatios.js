@@ -119,7 +119,6 @@ export default function RiskRatios({ data, currency }) {
             {[
               { label: 'vs 50-Day MA', value: `${parseFloat(d.technicals.priceVs50DMA) >= 0 ? '+' : ''}${parseFloat(d.technicals.priceVs50DMA || 0).toFixed(1)}%`, positive: parseFloat(d.technicals.priceVs50DMA) >= 0 },
               { label: 'vs 200-Day MA', value: `${parseFloat(d.technicals.priceVs200DMA) >= 0 ? '+' : ''}${parseFloat(d.technicals.priceVs200DMA || 0).toFixed(1)}%`, positive: parseFloat(d.technicals.priceVs200DMA) >= 0 },
-              { label: '52W Position', value: `${parseFloat(d.technicals.weekPosition52 || 0).toFixed(0)}%`, neutral: true },
               { label: 'Support', value: d.technicals.keyLevels?.support ? `${currencySymbol}${parseFloat(d.technicals.keyLevels.support).toFixed(2)}` : '—', neutral: true },
               { label: 'Resistance', value: d.technicals.keyLevels?.resistance ? `${currencySymbol}${parseFloat(d.technicals.keyLevels.resistance).toFixed(2)}` : '—', neutral: true },
             ].map(({ label, value, positive, neutral }) => (
@@ -129,6 +128,8 @@ export default function RiskRatios({ data, currency }) {
               </div>
             ))}
           </div>
+          {/* 52W Position Visual Bar */}
+          <Week52Bar pct={parseFloat(d.technicals.weekPosition52 || 0)} />
         </div>
       )}
 
@@ -254,24 +255,64 @@ function TechBadge({ label, value }) {
 function RiskFactor({ risk }) {
   const severityColors = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#22c55e' }
   const likelihoodColors = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#22c55e' }
+  const sevBg = { HIGH: 'rgba(239,68,68,0.10)', MEDIUM: 'rgba(245,158,11,0.10)', LOW: 'rgba(34,197,94,0.10)' }
+  const likBg = { HIGH: 'rgba(239,68,68,0.08)', MEDIUM: 'rgba(245,158,11,0.08)', LOW: 'rgba(34,197,94,0.08)' }
 
   return (
     <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.875rem', border: '1px solid rgba(255,255,255,0.04)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.4rem', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.5rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.82rem', color: 'var(--txt-primary)', fontWeight: 500, flex: 1 }}>{risk.risk}</span>
-        <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
-          <span style={{ fontSize: '0.62rem', color: severityColors[risk.severity], fontFamily: 'var(--font-dm-mono)' }}>
-            ⬆ {risk.severity}
-          </span>
-          <span style={{ fontSize: '0.62rem', color: likelihoodColors[risk.likelihood], fontFamily: 'var(--font-dm-mono)' }}>
-            ◎ {risk.likelihood}
-          </span>
+        <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0, flexWrap: 'wrap' }}>
+          <span style={{
+            fontSize: '0.6rem', fontFamily: 'var(--font-dm-mono)',
+            color: severityColors[risk.severity] || '#f59e0b',
+            background: sevBg[risk.severity] || 'rgba(245,158,11,0.08)',
+            border: `1px solid ${severityColors[risk.severity] || '#f59e0b'}44`,
+            padding: '0.15rem 0.5rem', borderRadius: '3px', letterSpacing: '0.05em'
+          }}>SEVERITY: {risk.severity}</span>
+          <span style={{
+            fontSize: '0.6rem', fontFamily: 'var(--font-dm-mono)',
+            color: likelihoodColors[risk.likelihood] || '#f59e0b',
+            background: likBg[risk.likelihood] || 'rgba(245,158,11,0.08)',
+            border: `1px solid ${likelihoodColors[risk.likelihood] || '#f59e0b'}33`,
+            padding: '0.15rem 0.5rem', borderRadius: '3px', letterSpacing: '0.05em'
+          }}>LIKELIHOOD: {risk.likelihood}</span>
         </div>
       </div>
-      <p style={{ fontSize: '0.78rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', lineHeight: 1.55 }}>{risk.detail}</p>
+      <p style={{ fontSize: '0.78rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', lineHeight: 1.55, margin: 0 }}>{risk.detail}</p>
     </div>
   )
 }
+
+function Week52Bar({ pct }) {
+  const pos = Math.max(0, Math.min(100, pct))
+  const label = pos <= 25 ? 'Near 52W Low — stock is trading close to its yearly floor'
+    : pos <= 50 ? 'Below Mid-Range — trading in the lower half of the year'
+    : pos <= 75 ? 'Above Mid-Range — trading in the upper half of the year'
+    : 'Near 52W High — stock is approaching its yearly peak'
+  const color = pos <= 25 ? '#ef4444' : pos <= 50 ? '#f59e0b' : pos <= 75 ? '#60a5fa' : '#22c55e'
+
+  return (
+    <div style={{ marginTop: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.875rem 1rem', border: '1px solid rgba(255,255,255,0.04)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem' }}>
+        <span style={{ fontSize: '0.65rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>52-Week Range Position</span>
+        <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.9rem', color, fontWeight: 600 }}>{pos.toFixed(0)}%</span>
+      </div>
+      {/* Bar */}
+      <div style={{ position: 'relative', height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'visible' }}>
+        <div style={{ height: '100%', width: `${pos}%`, background: `linear-gradient(90deg, #ef4444, #f59e0b 50%, #22c55e)`, borderRadius: '3px', transition: 'width 0.8s ease' }} />
+        {/* Marker */}
+        <div style={{ position: 'absolute', top: '-3px', left: `calc(${pos}% - 5px)`, width: '10px', height: '12px', background: color, borderRadius: '2px', boxShadow: `0 0 6px ${color}88` }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.3rem' }}>
+        <span style={{ fontSize: '0.6rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)' }}>52W Low</span>
+        <span style={{ fontSize: '0.6rem', color, fontFamily: 'var(--font-dm-mono)', maxWidth: '70%', textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
+        <span style={{ fontSize: '0.6rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)' }}>52W High</span>
+      </div>
+    </div>
+  )
+}
+
 
 function SectionTitle({ children }) {
   return <div style={{ fontSize: '0.68rem', color: 'var(--txt-muted)', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'var(--font-dm-mono)', marginBottom: '0.75rem' }}>{children}</div>
