@@ -195,18 +195,20 @@ export async function GET(request) {
     }
 
     // ─── TradingView Fallback ────────────────────────────────────────────
-	// FIX: ROE=0 counts as missing so TradingView can fetch real value
+	// Only trigger if 3+ critical fields are missing.
+	// EV/EBITDA formula + Screener cover most gaps — TradingView is truly last-resort.
 	const hasMissingROE = data.roe === null || data.roe === undefined || data.roe === 0
 	const missingCritical = [
 		data.pe, data.priceToBook, data.debtToEquity,
 		data.currentRatio, data.evToEbitda,
 		].filter(v => v === null || v === undefined).length + (hasMissingROE ? 1 : 0)
 
-	if (missingCritical >= 2 || hasMissingROE) {
+	if (missingCritical >= 3) {
       try {
         const tv = tickerToTradingView(validation.ticker)
         if (tv) {
-          const tvTimeout = new Promise(resolve => setTimeout(() => resolve(null), 20000))
+          // 6s cap: safe within Vercel's 10s serverless limit
+          const tvTimeout = new Promise(resolve => setTimeout(() => resolve(null), 6000))
           const tvFetch = fetchTradingViewData(tv.exchange, tv.symbol)
           const tvData = await Promise.race([tvFetch, tvTimeout])
           if (tvData) {
