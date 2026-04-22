@@ -119,10 +119,16 @@ INPUT DATA — use these exact figures as your base:
 - EBITDA (TTM): ${fmtNumber(d.ebitda)}
 - Gross Margin: ${fmtPercent(d.grossMargin)}
 - Operating Margin: ${fmtPercent(d.operatingMargin)}
+- Net Margin: ${fmtPercent(d.profitMargin)}
+- Revenue Growth (TTM): ${fmtPercent(d.revenueGrowth)}
 - Total Debt: ${fmtNumber(d.totalDebt)}
 - Cash & Equivalents: ${fmtNumber(d.totalCash)}
+- Free Cash Flow: ${fmtNumber(d.freeCashFlow)}
+- ROE: ${d.roe ? (d.roe * 100).toFixed(1) + '%' : 'N/A'}
+- Debt/Equity: ${d.debtToEquity?.toFixed(2) || 'N/A'}
+- Beta: ${d.beta?.toFixed(2) || 'N/A'}
 - Shares Outstanding: ${shares}
-- Sector: ${d.sector || 'N/A'}
+- Sector: ${d.sector || 'N/A'}, Industry: ${d.industry || 'N/A'}
 
 MATH RULES (violations = unusable output):
 1. UNIT CONSISTENCY (CRITICAL - ABSOLUTE NUMBERS ONLY): ALL currency values (Revenue, EBITDA, FCF, Cash, Debt, EV, EquityValue) MUST be output as RAW ABSOLUTE NUMBERS (e.g., 2,500,000,000). NEVER use units like "2.5B" or "2500M". The frontend expects raw numbers for correct per-share calculations. Input may be formatted (e.g., "$2.5B" or "₹600.32B") - you MUST convert these to absolute numbers (2,500,000,000) before any calculations.
@@ -287,11 +293,24 @@ RETURN ONLY THIS JSON STRUCTURE — NO MARKDOWN — replace ALL values with real
       [<per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>, <per_share_price>]
     ]
   },
-  "keyRisksToModel": ["<specific_risk_1_for_${ticker}>", "<specific_risk_2_for_${ticker}>", "<specific_risk_3_for_${ticker}>"],
+  "keyRisksToModel": [
+    "<RISK 1: specific to ${ticker}'s balance sheet — e.g. if Debt/Equity is high, state exact D/E ratio and how a 100bps rate rise inflates WACC by X% and compresses intrinsic value by Y%>",
+    "<RISK 2: specific to ${ticker}'s revenue or margin profile — e.g. if margins are thin or declining, cite the actual margin % and how a 200bps compression in EBITDA margin reduces FCF by how much in absolute terms>",
+    "<RISK 3: specific to ${ticker}'s FCF quality or capex cycle — e.g. if FCF is negative or capex-intensive, cite actual FCF figure and how a capex overrun of 10-15% delays FCF breakeven by how many years>",
+    "<RISK 4: specific to ${ticker}'s sector or macro exposure — e.g. if Beta > 1.0, cite exact beta and how a 10% market downturn statistically moves the stock; or cite a specific regulatory/commodity risk with quantified revenue exposure>",
+    "<RISK 5: specific to ${ticker}'s growth assumptions in this model — e.g. if TGR = X%, explain what revenue CAGR is required to justify it and what happens to intrinsic value if growth comes in 2-3% below the model>"
+  ],
   "analystNote": "<2-3 sentence summary of this specific DCF model's key assumptions and confidence for ${ticker}>"
 }
 
 CRITICAL: DO NOT copy the <placeholder> tags — replace every one with real computed values for ${ticker}.
+CRITICAL: keyRisksToModel MUST contain EXACTLY 5 risks. Each risk MUST:
+  - Name the specific financial metric from the INPUT DATA above (e.g. actual D/E ratio, actual FCF, actual beta)
+  - Quantify the downside impact on intrinsic value per share or WACC
+  - Be specific to ${ticker}'s industry: "${d.sector || 'its sector'}" / "${d.industry || 'its industry'}"
+  - NOT be a generic statement like "regulatory risk" or "competition" — those are BANNED unless tied to a specific number
+  - Example GOOD risk: "With Debt/Equity at 1.82x and net debt of ₹3.1T, a 100bps rate increase raises WACC from 9.2% to 10.1%, compressing intrinsic value by approximately ₹220/share (-15%)"
+  - Example BAD risk (BANNED): "Regulatory risks in the energy sector" ← too vague, no numbers
 DO NOT use markdown fences. Return ONLY the JSON object.
 ${d.screenerPeers?.length > 0 ? `\nPeer context for ${ticker}: ${d.screenerPeers.slice(0, 5).map(p => p.name || p.ticker).join(', ')}` : ''}`,
   }
