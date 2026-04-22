@@ -107,92 +107,56 @@ export function DCFProvider({ children, rawApiData, stockData }) {
         : [20, 21, 22, 23, 24]
 
     // ── 5-Year Projections ────────────────────────────────────────────────────
-    // Prefer AI-provided projections if they look valid (5 years, positive revenue)
-    let calculatedProjections
-    const aiProjections = d?.projections
+    // ALWAYS build from scratch using Yahoo ground-truth baseRevenue (absolute numbers).
+    // AI projections are intentionally IGNORED: the AI prompt outputs currencies in MILLIONS
+    // but sharesOutstanding from Yahoo is ABSOLUTE — division causes near-zero intrinsic value.
+    // Building from baseRevenue guarantees units are consistent throughout the entire pipeline.
+    let calculatedProjections = []
 
-    const aiProjectionsValid =
-      Array.isArray(aiProjections) &&
-      aiProjections.length === 5 &&
-      aiProjections.every(p => p?.revenue > 0 && p?.fcf !== undefined)
+    const revenueGrowth0 = revenueGrowthRates[0] || 10
+    const capexRate = calculateDynamicCapEx({
+      revenueGrowth: revenueGrowth0,
+      sector: stockData?.sector || d?.sector,
+      capexIntensity: stockData?.capexToRevenue || d?.capexToRevenue
+    })
 
-    if (aiProjectionsValid) {
-      // Use AI projections directly (they're already in absolute numbers)
-      calculatedProjections = aiProjections.map((p, i) => ({
-        year: p.year || i + 1,
-        revenue: p.revenue || 0,
-        ebitda: p.ebitda || 0,
-        ebit: p.ebit || 0,
-        nopat: p.nopat || 0,
-        capex: p.capex || 0,
-        nwcChange: p.nwcChange || 0,
-        fcf: p.fcf || 0,
-        pvFCF: calculatePV(p.fcf || 0, wacc, p.year || i + 1),
-      }))
-    } else {
-      // Recompute from scratch using Dynamic Assumption Engine
-      calculatedProjections = []
+    const baseFCF = baseEbitda * 0.6
+    const { fcfMultipliers, revenueGrowthMultipliers, ebitdaMarginMultipliers } = calculateGrowthJCurve({
+      baseFCF,
+      growthRate: terminalGrowthRate,
+      efficiencyMultiplier: 1.5
+    })
 
-      // Calculate dynamic CapEx % based on growth stage and sector
-      const revenueGrowth0 = revenueGrowthRates[0] || 10
-      const capexRate = calculateDynamicCapEx({
-        revenueGrowth: revenueGrowth0,
-        sector: stockData?.sector || d?.sector,
-        capexIntensity: stockData?.capexToRevenue || d?.capexToRevenue
-      })
+    for (let i = 0; i < 5; i++) {
+      const year = i + 1
+      const baseGrowthRate   = revenueGrowthRates[i] || 10
+      const baseEbitdaMargin = ebitdaMargins[i] || 20
 
-      // Get J-Curve multipliers for growth ramp
-      // J-Curve applies to Revenue, EBITDA margins, AND FCF to capture Operating Leverage
-      const baseFCF = baseEbitda * 0.6
-      const { fcfMultipliers, revenueGrowthMultipliers, ebitdaMarginMultipliers } = calculateGrowthJCurve({
-        baseFCF,
-        growthRate: terminalGrowthRate,
-        efficiencyMultiplier: 1.5 // Early CapEx pays off 1.5x in later years
-      })
+      const jCurveGrowthRate   = baseGrowthRate   * revenueGrowthMultipliers[i]
+      const jCurveEbitdaMargin = baseEbitdaMargin * ebitdaMarginMultipliers[i]
 
-      for (let i = 0; i < 5; i++) {
-        const year = i + 1
-        const baseGrowthRate = revenueGrowthRates[i] || 10
-        const baseEbitdaMargin = ebitdaMargins[i] || 20
+      const revenue      = baseRevenue * Math.pow(1 + jCurveGrowthRate / 100, year)
+      const ebitda       = calculateEBITDA(revenue, jCurveEbitdaMargin)
+      const depreciation = ebitda * 0.12
+      const ebit         = ebitda - depreciation
+      const nopat        = calculateNOPAT(ebit, taxRate)
 
-        // Apply J-Curve: Conservative start for revenue growth, accelerating later
-        const jCurveGrowthRate = baseGrowthRate * revenueGrowthMultipliers[i]
-        // Apply J-Curve: EBITDA margins improve as operating leverage kicks in
-        const jCurveEbitdaMargin = baseEbitdaMargin * ebitdaMarginMultipliers[i]
+      const capexAdjustment = i < 2 ? 1.3 : (i === 2 ? 1.0 : 0.8)
+      let capex = -(revenue * capexRate * capexAdjustment)
 
-        const revenue = baseRevenue * Math.pow(1 + jCurveGrowthRate / 100, year)
-        const ebitda = calculateEBITDA(revenue, jCurveEbitdaMargin)
-        const depreciation = ebitda * 0.12
-        const ebit = ebitda - depreciation
-        const nopat = calculateNOPAT(ebit, taxRate)
+      const prevRevenue = i === 0 ? baseRevenue : calculatedProjections[i - 1].revenue
+      const nwcChange   = (revenue - prevRevenue) * 0.03
 
-        // Dynamic CapEx: higher in early years (J-curve investment), lower later
-        const capexAdjustment = i < 2 ? 1.3 : (i === 2 ? 1.0 : 0.8)
-        let capex = revenue * capexRate * capexAdjustment
-
-        const prevRevenue = i === 0 ? baseRevenue : calculatedProjections[i - 1].revenue
-        const nwcChange = (revenue - prevRevenue) * 0.03
-
-        // Terminal Year CapEx Convergence: In steady state, CapEx ≈ Depreciation
-        // This prevents valuation decay - institutional best practice
-        if (i === 4) {
-          const baseTerminalCapEx = Math.abs(capex)
-          const convergedCapEx = calculateTerminalCapEx(
-            depreciation,
-            baseTerminalCapEx,
-            0.9 // convergence factor
-          )
-          capex = -convergedCapEx
-        }
-
-        // Calculate base FCF and apply J-curve growth multiplier
-        const baseFcfYear = calculateFCF(nopat, depreciation, capex, nwcChange)
-        const fcf = baseFcfYear * fcfMultipliers[i]
-
-        const pvFCF = calculatePV(fcf, wacc, year)
-
-        calculatedProjections.push({ year, revenue, ebitda, ebit, nopat, capex, nwcChange, fcf, pvFCF })
+      if (i === 4) {
+        const convergedCapEx = calculateTerminalCapEx(depreciation, Math.abs(capex), 0.9)
+        capex = -convergedCapEx
       }
+
+      const baseFcfYear = calculateFCF(nopat, depreciation, capex, nwcChange)
+      const fcf   = baseFcfYear * fcfMultipliers[i]
+      const pvFCF = calculatePV(fcf, wacc, year)
+
+      calculatedProjections.push({ year, revenue, ebitda, ebit, nopat, capex, nwcChange, fcf, pvFCF })
     }
 
     // ── Valuation math ────────────────────────────────────────────────────────
