@@ -33,47 +33,10 @@ export default function Home() {
 
   const [activeAnalysisTab, setActiveAnalysisTab] = useState('thesis')
   const [analysisCache, setAnalysisCache] = useState({})
-  
-  // Per-type loading and error states for parallel background fetching
-  const [loadingMap, setLoadingMap] = useState({})
-  const [errorMap, setErrorMap] = useState({})
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisError, setAnalysisError] = useState('')
 
   const resultsRef = useRef(null)
-
-  // ─── Run AI analysis ────────────────────────────────────────────────────────
-  const doFetch = useCallback(async (type, currentData) => {
-    const dataToUse = currentData || stockData
-    if (!dataToUse) return
-
-    const cacheKey = `${dataToUse.ticker}_${type}`
-    
-    setLoadingMap(prev => ({ ...prev, [type]: true }))
-    setErrorMap(prev => ({ ...prev, [type]: '' }))
-
-    try {
-      const data = await apiPost('/api/analyze', {
-        ticker: dataToUse.ticker,
-        analysisType: type,
-        stockData: dataToUse,
-      })
-      const normalizedData = normalizeAIResponse(data, type)
-      setAnalysisCache(prev => ({ ...prev, [cacheKey]: normalizedData }))
-    } catch (err) {
-      setErrorMap(prev => ({ ...prev, [type]: getErrorMessage(err) }))
-    } finally {
-      setLoadingMap(prev => ({ ...prev, [type]: false }))
-    }
-  }, [stockData])
-
-  const runAllAnalyses = useCallback((data) => {
-    // Run all 4 parameters in parallel
-    // Stagger slightly to avoid burst rate limits if many users trigger at once
-    ANALYSIS_TABS.forEach((tab, index) => {
-      setTimeout(() => {
-        doFetch(tab.id, data)
-      }, index * 400) 
-    });
-  }, [doFetch])
 
   // ─── Fetch stock data ───────────────────────────────────────────────────────
   const handleSearch = useCallback(async (ticker) => {
@@ -81,15 +44,11 @@ export default function Home() {
     setStockError('')
     setStockData(null)
     setAnalysisCache({})
-    setLoadingMap({})
-    setErrorMap({})
+    setAnalysisError('')
 
     try {
       const data = await apiFetch(`/api/stock?ticker=${encodeURIComponent(ticker)}`)
       setStockData(data)
-      
-      // TRIGGER ALL AI ANALYSES IN BACKGROUND IMMEDIATELY
-      runAllAnalyses(data)
 
       // Smooth scroll to results
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
@@ -98,7 +57,29 @@ export default function Home() {
     } finally {
       setStockLoading(false)
     }
-  }, [runAllAnalyses])
+  }, [])
+
+  // ─── Run AI analysis ────────────────────────────────────────────────────────
+  // doFetch: the actual API call, shared by both normal runs and forced retries
+  const doFetch = useCallback(async (type) => {
+    if (!stockData) return
+    const cacheKey = `${stockData.ticker}_${type}`
+    setAnalysisLoading(true)
+    setAnalysisError('')
+    try {
+      const data = await apiPost('/api/analyze', {
+        ticker: stockData.ticker,
+        analysisType: type,
+        stockData,
+      })
+      const normalizedData = normalizeAIResponse(data, type)
+      setAnalysisCache(prev => ({ ...prev, [cacheKey]: normalizedData }))
+    } catch (err) {
+      setAnalysisError(getErrorMessage(err))
+    } finally {
+      setAnalysisLoading(false)
+    }
+  }, [stockData])
 
   const handleRunAnalysis = useCallback(async (type) => {
     if (!stockData) return
@@ -109,9 +90,10 @@ export default function Home() {
 
   const handleTabChange = (tabId) => {
     setActiveAnalysisTab(tabId)
+    setAnalysisError('')   // clear stale error on tab change
   }
 
-  // handleRetry calls doFetch directly — bypasses cache check
+  // handleRetry calls doFetch directly — bypasses cache check (stale closure safe)
   const handleRetry = useCallback(() => {
     if (!stockData) return
     const cacheKey = `${stockData.ticker}_${activeAnalysisTab}`
@@ -120,13 +102,12 @@ export default function Home() {
       delete next[cacheKey]
       return next
     })
+    setAnalysisError('')
     doFetch(activeAnalysisTab)
   }, [stockData, activeAnalysisTab, doFetch])
 
   const currentCacheKey = stockData ? `${stockData.ticker}_${activeAnalysisTab}` : null
   const currentAnalysis = currentCacheKey ? analysisCache[currentCacheKey] : null
-  const isCurrentLoading = loadingMap[activeAnalysisTab]
-  const currentError = errorMap[activeAnalysisTab]
 
   return (
     <div style={{ minHeight: '100vh' }}>
@@ -182,29 +163,19 @@ export default function Home() {
 
                 <div style={{ marginBottom: '0.875rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid rgba(0,212,170,0.1)', flex: 1 }}>
-                    {ANALYSIS_TABS.map(tab => {
-                      const isTabLoading = loadingMap[tab.id]
-                      const isTabCached = analysisCache[`${stockData.ticker}_${tab.id}`]
-                      
-                      return (
-                        <button
-                          key={tab.id}
-                          className={`tab-btn ${activeAnalysisTab === tab.id ? 'active' : ''}`}
-                          onClick={() => handleTabChange(tab.id)}
-                          style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                        >
-                          <span className="tab-label">{tab.label}</span>
-                          {isTabLoading && (
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="3" style={{ animation: 'spin 1s linear infinite' }}>
-                              <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                            </svg>
-                          )}
-                          {isTabCached && !isTabLoading && (
-                            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--teal)', display: 'inline-block', marginLeft: '2px' }} />
-                          )}
-                        </button>
-                      )
-                    })}
+                    {ANALYSIS_TABS.map(tab => (
+                      <button
+                        key={tab.id}
+                        className={`tab-btn ${activeAnalysisTab === tab.id ? 'active' : ''}`}
+                        onClick={() => handleTabChange(tab.id)}
+                        style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                      >
+                        <span className="tab-label">{tab.label}</span>
+                        {analysisCache[`${stockData.ticker}_${tab.id}`] && (
+                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--teal)', display: 'inline-block', marginLeft: '2px' }} />
+                        )}
+                      </button>
+                    ))}
                   </div>
 
                   <ExportPDF
@@ -214,8 +185,8 @@ export default function Home() {
                   />
                 </div>
 
-                <div className="card" style={{ minHeight: '300px', padding: isCurrentLoading || !currentAnalysis ? '1.5rem' : '1.5rem' }}>
-                  {isCurrentLoading ? (
+                <div className="card" style={{ minHeight: '300px', padding: analysisLoading || !currentAnalysis ? '1.5rem' : '1.5rem' }}>
+                  {analysisLoading ? (
                     <TabSkeleton type={activeAnalysisTab} />
                   ) : currentAnalysis ? (
                     <>
@@ -243,19 +214,19 @@ export default function Home() {
                       )}
                     </>
                   ) : (
-                    // This state should ideally not be reachable if background fetch is working,
-                    // but we keep a fallback just in case.
-                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)' }}>
-                      Initialising analysis engines…
-                    </div>
+                    <RunAnalysisButton
+                      type={activeAnalysisTab}
+                      onClick={() => handleRunAnalysis(activeAnalysisTab)}
+                      loading={analysisLoading}
+                    />
                   )}
                 </div>
 
-                {currentError && !isCurrentLoading && (
+                {analysisError && !analysisLoading && (
                   <div className="card animate-fade-in" style={{ marginTop: '0.875rem', padding: '1rem 1.25rem', borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.04)' }}>
                     <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
                       <span style={{ color: '#ef4444' }}>⚠</span>
-                      <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.82rem', color: '#f87171' }}>{currentError}</span>
+                      <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '0.82rem', color: '#f87171' }}>{analysisError}</span>
                       <button
                         className="btn btn-ghost"
                         onClick={handleRetry}
