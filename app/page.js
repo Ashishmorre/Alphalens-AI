@@ -9,7 +9,7 @@ import RiskRatios from '../components/tabs/RiskRatios'
 import NewsSentiment from '../components/tabs/NewsSentiment'
 import CompareStocks from '../components/CompareStocks'
 import ExportPDF from '../components/ExportPDF'
-import { AnalysisLoader, RunAnalysisButton } from '../components/LoadingCard'
+import { AnalysisLoader, RunAnalysisButton, SkeletonStockOverview } from '../components/LoadingCard'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { apiFetch, apiPost, getErrorMessage } from '@/lib/api-client'
 import { normalizeAIResponse } from '@/lib/ai-normalizer'
@@ -117,15 +117,17 @@ export default function Home() {
         <SearchBar onSearch={handleSearch} loading={stockLoading} />
 
         {stockLoading && (
-          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', fontSize: '0.875rem' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite' }}>
-                <style>{`@keyframes spin { from{transform:rotate(0deg)}to{transform:rotate(360deg)} }`}</style>
-                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-              </svg>
-              Fetching live market data…
+          <>
+            <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', fontSize: '0.8125rem' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite' }}>
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>
+                Synchronizing with market servers…
+              </div>
             </div>
-          </div>
+            <SkeletonStockOverview />
+          </>
         )}
 
         {stockError && !stockLoading && (

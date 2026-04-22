@@ -9,7 +9,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getClientIP, checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/rate-limit'
+import { getClientIP, checkRateLimit, RATE_LIMIT_PRESETS, createRateLimitHeaders } from '@/lib/rate-limit'
 import { checkRequestSafety, SECURITY_HEADERS } from '@/lib/security'
 import { logError } from '@/lib/api-utils'
 import { runCompleteDCF, runBatchDCF } from '@/lib/dcf-orchestrator'

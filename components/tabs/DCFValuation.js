@@ -51,10 +51,10 @@ export default function DCFValuation({ currency }) {
           </div>
 
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <SummaryMetric label="WACC" value={`${d.assumptions?.wacc?.toFixed(1)}%`} />
-            <SummaryMetric label="Terminal Growth" value={`${d.assumptions?.terminalGrowthRate?.toFixed(1)}%`} />
-            <SummaryMetric label="Tax Rate" value={`${d.assumptions?.taxRate?.toFixed(1)}%`} />
-            <SummaryMetric label="Rating" value={dcfRating} color={ratingColor} />
+            <SummaryMetric label="WACC" value={d.assumptions?.wacc != null ? `${d.assumptions.wacc.toFixed(1)}%` : '—'} />
+            <SummaryMetric label="Terminal Growth" value={d.assumptions?.terminalGrowthRate != null ? `${d.assumptions.terminalGrowthRate.toFixed(1)}%` : '—'} />
+            <SummaryMetric label="Tax Rate" value={d.assumptions?.taxRate != null ? `${d.assumptions.taxRate.toFixed(1)}%` : '—'} />
+            <SummaryMetric label="Rating" value={dcfRating || '—'} color={ratingColor} />
           </div>
         </div>
 
@@ -66,7 +66,7 @@ export default function DCFValuation({ currency }) {
             { label: 'PV of TV', value: formatNumber(d.pvTerminalValue, 2, currency) },
             { label: 'Enterprise Value', value: formatNumber(d.enterpriseValue, 2, currency) },
             { label: 'Equity Value', value: formatNumber(d.equityValue, 2, currency) },
-            { label: 'Margin of Safety', value: `${d.marginOfSafety?.toFixed(1)}%`, color: upside > 0 ? 'var(--gain)' : 'var(--loss)' },
+            { label: 'Margin of Safety', value: d.marginOfSafety != null ? `${d.marginOfSafety.toFixed(1)}%` : '—', color: upside > 0 ? 'var(--gain)' : 'var(--loss)' },
           ].map(({ label, value, color }) => (
             <div key={label} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ fontSize: '0.65rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.3rem' }}>{label}</div>
@@ -94,7 +94,7 @@ export default function DCFValuation({ currency }) {
                   { key: 'ebitda', label: 'EBITDA', fmt: (v) => formatNumber(v, 2, currency) },
                   { key: 'ebit', label: 'EBIT', fmt: (v) => formatNumber(v, 2, currency) },
                   { key: 'nopat', label: 'NOPAT', fmt: (v) => formatNumber(v, 2, currency) },
-                  { key: 'capex', label: 'CapEx', fmt: (v) => `(${formatNumber(Math.abs(v), 2, currency)})` },
+                  { key: 'capex', label: 'CapEx', fmt: (v) => v != null && !Number.isNaN(v) ? `(${formatNumber(Math.abs(v), 2, currency)})` : '—' },
                   { key: 'nwcChange', label: 'NWC Change', fmt: (v) => formatNumber(v, 2, currency) },
                   { key: 'fcf', label: 'Free Cash Flow', fmt: (v) => formatNumber(v, 2, currency), highlight: true },
                 ].map(({ key, label, fmt, highlight }) => (
