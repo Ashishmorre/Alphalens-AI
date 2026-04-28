@@ -186,20 +186,35 @@ export default function Home() {
                           style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                         >
                           <span className="tab-label">{tab.label}</span>
-                          {/* Teal dot = ready, spinning = loading, red = error */}
+                          {/* Status dot: teal solid = ready | amber pulse = loading | red = error */}
                           {isReady && (
-                            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--teal)', display: 'inline-block', marginLeft: '2px' }} />
+                            <span title="Analysis ready" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--teal)', display: 'inline-block', marginLeft: '3px', boxShadow: '0 0 4px rgba(0,212,170,0.6)', flexShrink: 0 }} />
                           )}
                           {isLoading && !isReady && (
-                            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(0,212,170,0.35)', display: 'inline-block', marginLeft: '2px', animation: 'pulse 1.2s ease-in-out infinite' }} />
+                            <span title="Loading…" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'rgba(245,158,11,0.9)', display: 'inline-block', marginLeft: '3px', animation: 'pulse 1s ease-in-out infinite', flexShrink: 0 }} />
                           )}
                           {hasError && !isLoading && !isReady && (
-                            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', marginLeft: '2px' }} />
+                            <span title="Failed — click Retry" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', marginLeft: '3px', flexShrink: 0 }} />
                           )}
                         </button>
                       )
                     })}
                   </div>
+
+                  {/* Progress summary line */}
+                  {(() => {
+                    const readyCount   = ANALYSIS_TABS.filter(t => !!analysisCache[`${stockData.ticker}_${t.id}`]).length
+                    const loadingCount = ANALYSIS_TABS.filter(t => !!tabLoading[t.id] && !analysisCache[`${stockData.ticker}_${t.id}`]).length
+                    const errorCount   = ANALYSIS_TABS.filter(t => !!tabErrors[t.id] && !tabLoading[t.id] && !analysisCache[`${stockData.ticker}_${t.id}`]).length
+                    if (readyCount === 0 && loadingCount === 0) return null
+                    return (
+                      <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-dm-mono)', color: 'var(--txt-muted)', display: 'flex', gap: '0.75rem', alignItems: 'center', paddingRight: '0.5rem', whiteSpace: 'nowrap' }}>
+                        {loadingCount > 0 && <span style={{ color: 'rgba(245,158,11,0.85)' }}>⟳ {loadingCount} running</span>}
+                        {readyCount > 0 && <span style={{ color: 'var(--teal)' }}>✓ {readyCount}/{ANALYSIS_TABS.length} ready</span>}
+                        {errorCount > 0 && <span style={{ color: '#ef4444' }}>✗ {errorCount} failed</span>}
+                      </div>
+                    )
+                  })()}
 
                   <ExportPDF
                     stockData={stockData}
