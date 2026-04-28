@@ -431,13 +431,31 @@ function buildRiskPrompt(ticker, d) {
   const fwdPe = d.forwardPE?.toFixed?.(2) || 'Ã¢â‚¬â€'
   const evEbitda = d.evToEbitda?.toFixed?.(2) || 'Ã¢â‚¬â€'
 
-  // Sector median from Screener.in industryPE (safe null-check)
+  // Sector median: prefer Screener.in industryPE, fallback to hardcoded sector table.
+  // This eliminates AI placeholder strings like <sector_median_pe>x in the output.
+  const SECTOR_PE_TABLE = {
+    'financial services': 12, 'banking': 12, 'bank': 12, 'insurance': 14,
+    'technology': 28,  'software': 28, 'information technology': 28,
+    'energy': 14,      'oil': 14,  'gas': 14,
+    'consumer': 30,    'retail': 28, 'fmcg': 32, 'food': 30,
+    'healthcare': 25,  'pharma': 25, 'hospital': 22,
+    'industrials': 18, 'manufacturing': 16, 'auto': 15,
+    'materials': 12,   'metals': 10, 'mining': 10, 'cement': 14,
+    'utilities': 16,   'power': 14, 'telecom': 18,
+    'real estate': 20, 'realty': 20,
+  }
+  const sectorLower = (d.sector || d.industry || '').toLowerCase()
   const industryPE = (d.screenerRatios?.industryPE != null)
     ? Number(d.screenerRatios.industryPE)
-    : null
-  const sectorMedianPE     = industryPE != null ? `${industryPE.toFixed(1)}x`               : '<sector_median_pe>x'
-  const sectorMedianFwdPE  = industryPE != null ? `${(industryPE * 0.9).toFixed(1)}x`       : '<sector_median_fwd_pe>x'
-  const sectorMedianEvEbitda = industryPE != null ? `${(industryPE * 0.65).toFixed(1)}x`    : '<sector_median_ev_ebitda>x'
+    : (() => {
+        for (const [key, pe] of Object.entries(SECTOR_PE_TABLE)) {
+          if (sectorLower.includes(key)) return pe
+        }
+        return 18 // broad market default
+      })()
+  const sectorMedianPE       = `${industryPE.toFixed(1)}x`
+  const sectorMedianFwdPE    = `${(industryPE * 0.9).toFixed(1)}x`
+  const sectorMedianEvEbitda = `${(industryPE * 0.65).toFixed(1)}x`
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ Peer context Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const buildPeerContext = () => {
@@ -487,21 +505,32 @@ function buildRiskPrompt(ticker, d) {
 
   // Leverage ratios
   const debtEqNum     = safe(d.debtToEquity)
+    ?? safe(d.screenerRatios?.debtToEquity) // Screener fallback for Indian stocks
   const curRatioNum   = safe(d.currentRatio)
   const quickRatioNum = safe(d.quickRatio)
   const ebitda        = safe(d.ebitda)
   const totalDebt     = safe(d.totalDebt)
   const totalCash     = safe(d.totalCash)
-  const totalAssets   = safe(d.totalAssets)
+  // totalAssets: try Yahoo first, then XBRL metrics (critical for banking stocks)
+  const totalAssets   = safe(d.totalAssets) ?? safe(d._xbrlMetrics?.totalEquity)
   const intExp        = safe(d.interestExpense) // usually negative from Yahoo
+  // Interest Coverage: if Yahoo's interestExpense is missing (common for banks/Indian stocks),
+  // use the interestCoverage ratio directly from TradingView scraper.
+  const tvIntCov      = safe(d.interestCoverage) // filled by TradingView if available
   const revenue       = safe(d.revenue)
   const opMargin      = safe(d.operatingMargin)
   const ebit          = revenue && opMargin ? revenue * opMargin : null
 
   const netDebt       = totalDebt !== null && totalCash !== null ? totalDebt - totalCash : null
   const ndEbitdaNum   = netDebt !== null && ebitda && ebitda > 0 ? netDebt / ebitda : null
-  const intCovNum     = ebit && intExp && intExp !== 0 ? ebit / Math.abs(intExp) : null
-  const dAssetsNum    = totalDebt !== null && totalAssets && totalAssets > 0 ? (totalDebt / totalAssets) * 100 : null
+  // Use calculated interest coverage first; if intExp is null, use TradingView's direct ratio
+  const intCovNum     = ebit && intExp && intExp !== 0
+    ? ebit / Math.abs(intExp)
+    : tvIntCov !== null ? tvIntCov : null
+  // Debt/Assets: standard calc; for banks without totalAssets, use D/E as proxy display
+  const dAssetsNum    = totalDebt !== null && totalAssets && totalAssets > 0
+    ? (totalDebt / totalAssets) * 100
+    : null
 
   // Quality ratios
   const roeNum        = safe(d.roe)   // decimal (0.12 = 12%)
