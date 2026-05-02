@@ -2,6 +2,7 @@
 import { useState, useCallback, useRef } from 'react'
 import Header from '../components/Header'
 import SearchBar from '../components/SearchBar'
+import LandingHero from '../components/LandingHero'
 import StockOverview from '../components/StockOverview'
 import InvestmentThesis from '../components/tabs/InvestmentThesis'
 import DCFValuation from '../components/tabs/DCFValuation'
@@ -119,12 +120,22 @@ export default function Home() {
   const isTabLoading     = !!tabLoading[activeAnalysisTab]
   const tabError         = tabErrors[activeAnalysisTab] || null
 
+  // Whether to show the landing hero (no result yet, not loading)
+  const showLanding = !stockData && !stockLoading && !stockError
+
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Header />
+      {/* Header only shown when results are active */}
+      {!showLanding && <Header />}
 
-      <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 1rem 4rem' }}>
-        <SearchBar onSearch={handleSearch} loading={stockLoading} />
+      {/* Full-screen landing: search + features + footer */}
+      {showLanding && (
+        <LandingHero onSearch={handleSearch} loading={stockLoading} />
+      )}
+
+      <main style={{ maxWidth: '1280px', margin: '0 auto', padding: showLanding ? 0 : '0 1rem 4rem' }}>
+        {/* Compact search bar only shown once results load */}
+        {!showLanding && <SearchBar onSearch={handleSearch} loading={stockLoading} />}
 
         {stockLoading && (
           <>
@@ -296,18 +307,17 @@ export default function Home() {
           </div>
         )}
 
-        {!stockData && !stockLoading && !stockError && (
-          <FeatureCards />
-        )}
       </main>
 
-      <footer className="no-print" style={{ borderTop: '1px solid rgba(0,212,170,0.07)', padding: '1.5rem', textAlign: 'center' }}>
-        <p style={{ fontSize: '0.72rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', lineHeight: 1.6 }}>
-          AlphaLens AI · Powered by NVIDIA NIM & Yahoo Finance · For informational purposes only — not investment advice.
-          <br />
-          Built by <span style={{ color: 'var(--teal)' }}>Ashish & Aman Agrahari</span> · CFA Candidate · BCom Hons
-        </p>
-      </footer>
+      {/* Compact footer when results are shown */}
+      {!showLanding && (
+        <footer className="no-print" style={{ borderTop: '1px solid rgba(0,212,170,0.07)', padding: '1.25rem', textAlign: 'center' }}>
+          <p style={{ fontSize: '0.68rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', lineHeight: 1.6 }}>
+            AlphaLens AI · Powered by NVIDIA NIM & Yahoo Finance · Not investment advice.
+            {' '}Built by <span style={{ color: 'var(--teal)' }}>Ashish & Aman Agrahari</span>
+          </p>
+        </footer>
+      )}
 
       <style>{`
         @media (max-width: 640px) {
@@ -323,60 +333,4 @@ export default function Home() {
   )
 }
 
-function FeatureCards() {
-  const features = [
-    {
-      icon: '◆',
-      title: 'Investment Thesis',
-      desc: 'AI-generated bull, bear & base cases with price targets, moat analysis, and position sizing guidance.',
-    },
-    {
-      icon: '◆',
-      title: 'DCF Valuation',
-      desc: '5-year free cash flow model with WACC, terminal value, intrinsic value per share & sensitivity tables.',
-    },
-    {
-      icon: '◆',
-      title: 'Risk & Ratios',
-      desc: 'Complete ratio suite with sector benchmarks, risk matrix, leverage health & technical signals.',
-    },
-    {
-      icon: '◆',
-      title: 'News Sentiment',
-      desc: 'Sentiment scoring, analyst consensus, macro exposure, catalysts & 30-60 day tactical notes.',
-    },
-    {
-      icon: '◆',
-      title: 'Compare Stocks',
-      desc: 'Head-to-head comparison of any two tickers with dimension scores and investor-type recommendations.',
-    },
-    {
-      icon: '◆',
-      title: 'PDF Export',
-      desc: 'Download a styled research report PDF of any analysis tab to share or store for your portfolio.',
-    },
-  ]
 
-  return (
-    <div style={{ paddingTop: '1rem', paddingBottom: '2rem' }}>
-      <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-        <div style={{ fontSize: '0.72rem', color: 'var(--txt-muted)', fontFamily: 'var(--font-dm-mono)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-          What AlphaLens AI Can Do
-        </div>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.875rem' }}>
-        {features.map((f, i) => (
-          <div
-            key={i}
-            className="card animate-slide-up"
-            style={{ padding: '1.25rem', animationDelay: `${i * 0.08}s` }}
-          >
-            <div style={{ fontSize: '1.5rem', marginBottom: '0.625rem' }}>{f.icon}</div>
-            <div style={{ fontFamily: 'var(--font-playfair)', fontSize: '0.95rem', color: 'var(--txt-primary)', marginBottom: '0.375rem', fontWeight: 500 }}>{f.title}</div>
-            <p style={{ fontSize: '0.78rem', color: 'var(--txt-secondary)', fontFamily: 'var(--font-dm-mono)', lineHeight: 1.6 }}>{f.desc}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
